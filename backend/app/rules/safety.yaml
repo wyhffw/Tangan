@@ -21,7 +21,7 @@ rules:
   - id: SAFE-004
     type: block
     target: user
-    when: 'text_has("用药") or text_has("剂量") or text_has("诊断") or text_has("急症") or text_has("胸痛") or text_has("胸口疼") or text_has("低血糖") or text_has("昏迷")'
+    when: 'text_has("用药") or text_has("剂量") or text_has("诊断") or text_has("急症") or text_has("胸痛") or text_has("胸口疼") or text_has("低血糖") or text_has("昏迷") or text_has("一次吃多少") or text_has("吃几片") or text_has("几片") or text_has("几粒") or text_has("几毫升") or text_has("多少单位") or text_has("多少毫克") or text_has("用量") or text_has("二甲双胍") or text_has("胰岛素") or text_has("阿卡波糖") or text_has("格列") or text_has("达格列净") or text_has("恩格列净") or text_has("利拉鲁肽") or text_has("司美格鲁肽") or text_has("度拉糖肽") or text_has("瑞格列奈") or text_has("西格列汀") or text_has("吡格列酮") or text_has("罗格列酮")'
     message: "这个问题涉及用药、诊断或急症，请就医或咨询医生、营养师。"
     source: "安全边界：用药、诊断和急症不由本系统回答"
   - id: SAFE-005

@@ -6,10 +6,11 @@ from neo4j.exceptions import Neo4jError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agent.chat import ChatDeps, FoodRecord, run_chat
+from app.agent.chat import ChatDeps, FoodRecord, correct_draft, run_chat
+from app.agent.prompts import DISCLAIMER
 from app.graph.queries import GraphQueryError, neighborhood
 from app.graph.sync import GraphUnavailable, neo4j_driver
-from app.models.entities import Food, HealthProfile
+from app.models.entities import Food, HealthProfile, PendingProfileUpdate
 from app.rag.embeddings import embed_texts
 from app.rag.retrieve import search_guidelines
 from app.rag.vectorstore import chroma_directory, get_collection, open_client
@@ -17,6 +18,8 @@ from app.repositories.chats import (
     add_message,
     add_pending,
     add_session,
+    delete_pending,
+    get_latest_pending,
     get_session_for_user,
     list_messages,
     list_sessions,
@@ -45,6 +48,9 @@ def answer_question(
         raise ChatError(status_code=422, detail="请输入问题", code="message_required")
     chat = _session(session, user_id, session_id)
     add_message(session, chat.id, "user", cleaned)
+    pending = get_latest_pending(session, user_id)
+    if pending is not None:
+        return _resolve_pending(session, user_id, chat.id, cleaned, pending)
     result = run_chat(default_deps(session), user_id=user_id, question=cleaned)
     pending_id = None
     draft = result.get("draft") if isinstance(result.get("draft"), dict) else {}
@@ -75,6 +81,111 @@ def answer_question(
         "pending_profile_id": pending_id,
         "draft": draft,
     }
+
+
+_CONFIRM = frozenset({"确认", "确认写入", "保存", "写入", "写入档案", "好的", "可以", "好", "嗯"})
+_CANCEL = frozenset({"取消", "不用了", "算了", "不保存", "不要了"})
+
+
+def _resolve_pending(
+    session: Session,
+    user_id: int,
+    chat_id: int,
+    message: str,
+    pending: PendingProfileUpdate,
+) -> dict[str, object]:
+    """处理对话录入的确认、取消和纠正。任何健康信息都只在确认后写入档案。"""
+    intent = _pending_intent(message)
+    if intent == "confirm":
+        draft_copy = dict(pending.draft or {})
+        _apply_draft(session, user_id, pending)
+        delete_pending(session, pending)
+        answer = f"已写入档案。{_preview_text(draft_copy)}\n{DISCLAIMER}"
+        pending_id = None
+        draft: dict[str, object] = {}
+    elif intent == "cancel":
+        delete_pending(session, pending)
+        answer = f"已取消，档案未改动。\n{DISCLAIMER}"
+        pending_id = None
+        draft = {}
+    else:
+        draft = dict(correct_draft(message, dict(pending.draft or {})))
+        pending.draft = draft
+        session.add(pending)
+        answer = f"我记下了这些信息，确认后才会写入档案。{_preview_text(draft)}\n{DISCLAIMER}"
+        pending_id = pending.id
+    meta = {
+        "route": "profile_update",
+        "blocked": False,
+        "citation_ids": [],
+        "sources": [],
+        "pending_profile_id": pending_id,
+        "draft": draft,
+    }
+    add_message(session, chat_id, "assistant", answer, meta)
+    session.commit()
+    return {
+        "session_id": chat_id,
+        "route": "profile_update",
+        "blocked": False,
+        "answer": answer,
+        "citation_ids": [],
+        "sources": [],
+        "graph": "up",
+        "rag": "up",
+        "pending_profile_id": pending_id,
+        "draft": draft,
+    }
+
+
+def _pending_intent(message: str) -> str:
+    text = message.strip()
+    if text in _CONFIRM:
+        return "confirm"
+    if text in _CANCEL:
+        return "cancel"
+    return "correct"
+
+
+def _apply_draft(
+    session: Session, user_id: int, pending: PendingProfileUpdate
+) -> None:
+    profile = get_by_user_id(session, user_id) or HealthProfile(user_id=user_id)
+    draft = dict(pending.draft or {})
+    profile.allergies = _merge_unique(
+        list(profile.allergies or []), _as_list(draft.get("allergies"))
+    )
+    profile.dislikes = _merge_unique(
+        list(profile.dislikes or []), _as_list(draft.get("dislikes"))
+    )
+    session.add(profile)
+
+
+def _merge_unique(existing: list[str], incoming: list[str]) -> list[str]:
+    merged = list(existing)
+    for item in incoming:
+        if item and item not in merged:
+            merged.append(item)
+    return merged
+
+
+def _as_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
+def _preview_text(draft: dict[str, object]) -> str:
+    parts: list[str] = []
+    allergies = _as_list(draft.get("allergies"))
+    dislikes = _as_list(draft.get("dislikes"))
+    if allergies:
+        parts.append("过敏原：" + "、".join(allergies))
+    if dislikes:
+        parts.append("不吃：" + "、".join(dislikes))
+    if not parts:
+        return "请到健康档案页核对后再保存。"
+    return "预览：" + "；".join(parts) + "。"
 
 
 def stream_events(

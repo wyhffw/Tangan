@@ -4,6 +4,7 @@ from app.services.nutrition import (
     KCAL_SOURCE,
     age_in_year,
     body_mass_index,
+    current_year,
     is_adult,
     kcal_per_kg,
     suggested_daily_kcal,
@@ -50,3 +51,23 @@ def test_calorie_formula_ignores_glucose() -> None:
     names = suggested_daily_kcal.__code__.co_varnames
     assert "fasting_glucose" not in names
     assert "hba1c" not in names
+
+
+def test_current_year_uses_app_timezone() -> None:
+    year = current_year()
+    assert 2000 <= year <= 2100
+
+
+def test_missing_fields_return_none() -> None:
+    assert suggested_daily_kcal(None, Decimal(55), "中") is None
+    assert suggested_daily_kcal(Decimal(160), None, "中") is None
+    assert suggested_daily_kcal(Decimal(160), Decimal(55), "") is None
+
+
+def test_nonpositive_ideal_weight_returns_none() -> None:
+    assert suggested_daily_kcal(Decimal(100), Decimal(50), "中") is None
+
+
+def test_unknown_activity_returns_none() -> None:
+    assert kcal_per_kg("未知", Decimal(22)) is None
+    assert suggested_daily_kcal(Decimal(160), Decimal(55), "未知") is None

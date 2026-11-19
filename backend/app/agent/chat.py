@@ -11,7 +11,12 @@ from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from app.agent.prompts import CHAT_SYSTEM, DISCLAIMER, UNAVAILABLE_CHAT
+from app.agent.prompts import (
+    CHAT_SYSTEM,
+    DISCLAIMER,
+    PROFILE_UPDATE_SYSTEM,
+    UNAVAILABLE_CHAT,
+)
 from app.core.llm import generate
 from app.rules.engine import evaluate
 
@@ -104,6 +109,31 @@ def extract_draft(question: str) -> dict[str, list[str]]:
         "allergies": _unique(item for group in allergies for item in group),
         "dislikes": _unique(item for group in dislikes for item in group),
     }
+
+
+def correct_draft(question: str, old_draft: dict[str, object]) -> dict[str, list[str]]:
+    """用 LLM 理解用户的纠正或补充，返回新草稿。模型不可用时退回正则抽取。"""
+    payload = {"old": old_draft or {}, "message": question}
+    try:
+        raw = generate(
+            [
+                {"role": "system", "content": PROFILE_UPDATE_SYSTEM},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+            purpose="chat",
+        )
+        parsed = _parse_json(raw)
+        if parsed is not None:
+            allergies = parsed.get("allergies")
+            dislikes = parsed.get("dislikes")
+            if isinstance(allergies, list) and isinstance(dislikes, list):
+                return {
+                    "allergies": _unique(allergies),
+                    "dislikes": _unique(dislikes),
+                }
+    except Exception:  # noqa: BLE001
+        pass
+    return extract_draft(question)
 
 
 def meal_from_question(question: str) -> str | None:

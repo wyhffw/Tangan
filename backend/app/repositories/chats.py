@@ -69,3 +69,17 @@ def add_pending(
     session.add(row)
     session.flush()
     return row
+
+
+def get_latest_pending(
+    session: Session, user_id: int
+) -> PendingProfileUpdate | None:
+    return session.scalars(
+        select(PendingProfileUpdate)
+        .where(PendingProfileUpdate.user_id == user_id)
+        .order_by(PendingProfileUpdate.id.desc())
+    ).first()
+
+
+def delete_pending(session: Session, pending: PendingProfileUpdate) -> None:
+    session.delete(pending)

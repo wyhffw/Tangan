@@ -25,13 +25,15 @@
             </p>
           </el-collapse-item>
         </el-collapse>
-        <el-alert
-          v-if="item.pending"
-          title="这些信息还没有写入档案，确认流程在下一项完成。"
-          type="info"
-          show-icon
-          :closable="false"
-        />
+        <div v-if="item.pending" class="pending-card">
+          <p class="pending-title">这些信息还没有写入档案，确认后才会保存。</p>
+          <p v-if="item.draft?.allergies?.length">过敏原：{{ item.draft.allergies.join("、") }}</p>
+          <p v-if="item.draft?.dislikes?.length">不吃：{{ item.draft.dislikes.join("、") }}</p>
+          <div class="pending-actions">
+            <el-button size="small" type="primary" :disabled="sending" @click="confirmDraft">确认</el-button>
+            <el-button size="small" :disabled="sending" @click="cancelDraft">取消</el-button>
+          </div>
+        </div>
       </article>
       <form class="composer" @submit.prevent="send">
         <el-input v-model="draft" placeholder="例如：糖尿病能吃西瓜吗" :disabled="sending" />
@@ -55,6 +57,7 @@ interface Line {
   content: string;
   sources: ChatSource[];
   pending: boolean;
+  draft: { allergies?: string[]; dislikes?: string[] } | null;
 }
 
 const markdown = new MarkdownIt({ html: false, linkify: true });
@@ -93,18 +96,30 @@ async function openSession(id: number) {
     content: item.content,
     sources: item.meta.sources ?? [],
     pending: item.meta.pending_profile_id != null,
+    draft: item.meta.draft ?? null,
   }));
 }
 
-async function send() {
-  const text = draft.value.trim();
+function send() {
+  void sendText(draft.value.trim());
+}
+
+function confirmDraft() {
+  void sendText("确认");
+}
+
+function cancelDraft() {
+  void sendText("取消");
+}
+
+async function sendText(text: string) {
   if (!text || sending.value) {
     return;
   }
   error.value = "";
   sending.value = true;
-  messages.value.push({ role: "user", content: text, sources: [], pending: false });
-  const reply: Line = { role: "assistant", content: "", sources: [], pending: false };
+  messages.value.push({ role: "user", content: text, sources: [], pending: false, draft: null });
+  const reply: Line = { role: "assistant", content: "", sources: [], pending: false, draft: null };
   messages.value.push(reply);
   draft.value = "";
   try {
@@ -115,8 +130,9 @@ async function send() {
       onSources(items) {
         reply.sources = items;
       },
-      onPending() {
+      onPending(_pendingId, itemDraft) {
         reply.pending = true;
+        reply.draft = itemDraft;
       },
       onDone(id) {
         sessionId.value = id;
@@ -188,5 +204,25 @@ async function send() {
   display: flex;
   gap: 8px;
   margin-top: auto;
+}
+
+.pending-card {
+  border: 1px solid #d9b38c;
+  background: #fdf6ec;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pending-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.pending-card p {
+  margin: 0 0 4px;
+}
+
+.pending-actions {
+  margin-top: 8px;
 }
 </style>

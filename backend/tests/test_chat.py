@@ -100,6 +100,15 @@ def test_safety_kidney_pregnancy_and_dose() -> None:
     assert all("请就医" in str(item.block_message) for item in (kidney, pregnancy, dose))
 
 
+def test_safety_drug_name_and_dose_phrase() -> None:
+    reload_rules()
+    drug = evaluate({"diseases": []}, user_text="二甲双胍一次吃多少")
+    insulin = evaluate({"diseases": []}, user_text="胰岛素每天打多少单位")
+    assert drug.blocked
+    assert insulin.blocked
+    assert "请就医" in str(drug.block_message)
+
+
 def test_knowledge_uses_graph_rag_and_disclaimer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.agent.chat.generate",
@@ -315,3 +324,53 @@ def test_chat_and_stream_endpoints(client: TestClient) -> None:
     assert stream.status_code == 200
     assert "token" in stream.text
     assert "done" in stream.text
+
+
+def _pending_answer(session: MagicMock, user_id: int, message: str) -> dict[str, object]:
+    chat = MagicMock(id=3, user_id=user_id)
+    pending = MagicMock(id=9, draft={"allergies": ["虾"], "dislikes": ["香菜"]})
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr("app.services.chat.add_session", lambda *_args: chat)
+    monkey.setattr("app.services.chat.get_session_for_user", lambda *_args: chat)
+    monkey.setattr("app.services.chat.add_message", lambda *_args, **_kwargs: None)
+    monkey.setattr("app.services.chat.get_latest_pending", lambda *_args: pending)
+    monkey.setattr("app.services.chat.delete_pending", lambda *_args: None)
+    result = answer_question(session, user_id, message)
+    monkey.undo()
+    return result
+
+
+def test_pending_confirm_writes_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    profile = MagicMock()
+    profile.allergies = []
+    profile.dislikes = []
+    monkeypatch.setattr("app.services.chat.get_by_user_id", lambda *_args: profile)
+    db = MagicMock()
+    result = _pending_answer(db, 2, "确认")
+    assert result["pending_profile_id"] is None
+    assert "已写入档案" in str(result["answer"])
+    assert profile.allergies == ["虾"]
+    assert profile.dislikes == ["香菜"]
+
+
+def test_pending_cancel_keeps_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.services.chat.get_by_user_id",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("取消不应写档案")),
+    )
+    db = MagicMock()
+    result = _pending_answer(db, 2, "取消")
+    assert result["pending_profile_id"] is None
+    assert "已取消" in str(result["answer"])
+
+
+def test_pending_correct_updates_draft(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.services.chat.correct_draft",
+        lambda *_args, **_kwargs: {"allergies": ["螃蟹"], "dislikes": []},
+    )
+    db = MagicMock()
+    result = _pending_answer(db, 2, "不对，是对螃蟹过敏")
+    assert result["pending_profile_id"] == 9
+    assert "螃蟹" in str(result["answer"])
+    assert result["draft"]["allergies"] == ["螃蟹"]
