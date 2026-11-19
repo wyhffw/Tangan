@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
+import type { EChartsType } from "echarts";
 
 import {
   fetchFoodFacts,
@@ -56,12 +57,6 @@ import {
   type GraphNode,
   type Neighborhood,
 } from "../api/graph";
-
-interface Chart {
-  setOption: (option: object) => void;
-  on: (event: string, handler: (params: { dataType?: string; data?: GraphNode }) => void) => void;
-  dispose: () => void;
-}
 
 const labelNames: Record<string, string> = {
   Food: "食材",
@@ -91,7 +86,7 @@ const result = ref<Neighborhood | null>(null);
 const facts = ref<FoodFacts | null>(null);
 const factsNote = ref("");
 const chartEl = ref<HTMLDivElement | null>(null);
-const chart = shallowRef<Chart | null>(null);
+const chart = shallowRef<EChartsType | null>(null);
 let ticket = 0;
 
 function amount(value: number | null): string {
@@ -177,7 +172,7 @@ async function paint() {
     if (params.dataType !== "node" || !params.data) {
       return;
     }
-    void loadFacts(params.data);
+    void loadFacts(params.data as unknown as GraphNode);
   });
   chart.value = instance;
 }

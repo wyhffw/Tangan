@@ -3,7 +3,6 @@ import { createRouter, createWebHistory, type RouteRecordRaw, type Router } from
 import { useUserStore } from "../stores/user";
 import HomeView from "../views/HomeView.vue";
 import AuthView from "../views/AuthView.vue";
-import PlaceholderView from "../views/PlaceholderView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import FridgeView from "../views/FridgeView.vue";
 import RecommendView from "../views/RecommendView.vue";

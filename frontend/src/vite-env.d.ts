@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module "markdown-it";
-declare module "dompurify";
+import "vue-router";
 
 declare module "vue-router" {
   interface RouteMeta {
