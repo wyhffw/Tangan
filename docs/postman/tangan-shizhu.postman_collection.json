@@ -1,0 +1,1002 @@
+{
+  "info": {
+    "name": "糖安食助 API",
+    "description": "糖安食助后端接口集合，前缀 /api/v1。先调用 auth/login 获取 access_token。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000/api/v1"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "健康检查",
+      "item": [
+        {
+          "name": "健康检查",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "认证",
+      "item": [
+        {
+          "name": "注册",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo12345\"\n}"
+            }
+          }
+        },
+        {
+          "name": "登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo12345\"\n}"
+            }
+          }
+        },
+        {
+          "name": "当前用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "档案",
+      "item": [
+        {
+          "name": "获取档案",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "更新档案",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"height_cm\": 170,\n  \"weight_kg\": 70,\n  \"activity_level\": \"中\"\n}"
+            }
+          }
+        },
+        {
+          "name": "确认待写档案",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile/pending/1/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile",
+                "pending",
+                "1",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "取消待写档案",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile/pending/1/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile",
+                "pending",
+                "1",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "纠正待写档案",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile/pending/1/correct",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile",
+                "pending",
+                "1",
+                "correct"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"不对，是对螃蟹过敏\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "食材",
+      "item": [
+        {
+          "name": "搜索食材",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/foods?q=西瓜",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "foods?q=西瓜"
+              ]
+            }
+          }
+        },
+        {
+          "name": "食材详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/foods/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "foods",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "食谱",
+      "item": [
+        {
+          "name": "搜索食谱",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes?q=番茄&meal_type=dinner",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes?q=番茄&meal_type=dinner"
+              ]
+            }
+          }
+        },
+        {
+          "name": "食谱详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "冰箱",
+      "item": [
+        {
+          "name": "冰箱列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory"
+              ]
+            }
+          }
+        },
+        {
+          "name": "入库",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"food_id\": 1,\n  \"amount_g\": 500\n}"
+            }
+          }
+        },
+        {
+          "name": "修改库存",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount_g\": 300\n}"
+            }
+          }
+        },
+        {
+          "name": "删除库存",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "临期提醒",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/expiring",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "expiring"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "推荐",
+      "item": [
+        {
+          "name": "推荐",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recommend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recommend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"meal_type\": \"dinner\",\n  \"only_inventory\": false\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "计划",
+      "item": [
+        {
+          "name": "获取计划",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/meal-plans?date=2026-11-19",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "meal-plans?date=2026-11-19"
+              ]
+            }
+          }
+        },
+        {
+          "name": "加入计划",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/meal-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "meal-plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-19\",\n  \"meal_type\": \"dinner\",\n  \"recipe_id\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "移除计划",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/meal-plans/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "meal-plans",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "报告",
+      "item": [
+        {
+          "name": "日报",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/report/daily?date=2026-11-19",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "report",
+                "daily?date=2026-11-19"
+              ]
+            }
+          }
+        },
+        {
+          "name": "周报",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/report/weekly?end=2026-11-19",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "report",
+                "weekly?end=2026-11-19"
+              ]
+            }
+          }
+        },
+        {
+          "name": "解释报告",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/report/explain",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "report",
+                "explain"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-19\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "购物清单",
+      "item": [
+        {
+          "name": "生成清单",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopping/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopping",
+                "generate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-19\"\n}"
+            }
+          }
+        },
+        {
+          "name": "清单详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopping/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopping",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "勾选商品",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopping/items/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopping",
+                "items",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checked\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "入库",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopping/1/to-inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopping",
+                "1",
+                "to-inventory"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "问答",
+      "item": [
+        {
+          "name": "问答(非流式)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"糖尿病能吃西瓜吗\"\n}"
+            }
+          }
+        },
+        {
+          "name": "问答(流式)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/stream",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "stream"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"糖尿病能吃西瓜吗\"\n}"
+            }
+          }
+        },
+        {
+          "name": "会话列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "sessions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "会话详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/sessions/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "sessions",
+                "1"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "图谱",
+      "item": [
+        {
+          "name": "邻居查询",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graph/neighbors?name=西瓜&depth=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graph",
+                "neighbors?name=西瓜&depth=2"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "管理(admin)",
+      "item": [
+        {
+          "name": "上传指南",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/guidelines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "guidelines"
+              ]
+            }
+          }
+        },
+        {
+          "name": "重建索引",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reindex",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reindex"
+              ]
+            }
+          }
+        },
+        {
+          "name": "重建图谱",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/rebuild-graph",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "rebuild-graph"
+              ]
+            }
+          }
+        },
+        {
+          "name": "统计",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "stats"
+              ]
+            }
+          }
+        },
+        {
+          "name": "审计日志",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "audit"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
