@@ -14,6 +14,7 @@ from app.services.food_catalog import (
     GI_SOURCE,
     NUTRIENT_SOURCE,
     FoodRecord,
+    GiRecord,
     composition_records,
     gi_records,
 )
@@ -49,6 +50,19 @@ SEED_NAME_TO_COMPOSITION = {
     "草莓": "草莓［洋莓，凤阳草莓］",
     "纯牛奶": "纯牛奶（代表值，全脂）",
     "无糖酸奶": "酸奶（代表值，全脂）",
+}
+
+# 演示主食简名 -> GI 表食物名。GI 表里同一主食有多个变体（精米/糙米、煮/烤），
+# 这里按演示食谱的做法选一个（source 仍为待核对，见 food_catalog.GI_SOURCE）。
+SEED_NAME_TO_GI = {
+    "大米": "大米饭（粳米，精米）",
+    "糙米": "大米饭（粳米，糙米）",
+    "燕麦": "燕麦片粥",
+    "小米": "小米粥",
+    "荞麦": "荞麦（黄）",
+    "红薯": "甘薯（山芋）",
+    "玉米": "玉米（甜，煮）",
+    "全麦面包": "全麦（全麦面包）",
 }
 
 
@@ -126,6 +140,26 @@ def _merge_seed_foods(
     return merged
 
 
+def _attach_seed_gi(
+    by_name: dict[str, Food],
+    ready: list[GiRecord],
+) -> tuple[int, set[str]]:
+    """把 GI 表条目按映射 attach 到演示主食简名，返回 (attached, 已映射的 GI 名)。"""
+    gi_by_name = {record.name: record for record in ready}
+    attached = 0
+    mapped: set[str] = set()
+    for seed_name, gi_name in SEED_NAME_TO_GI.items():
+        food = by_name.get(seed_name)
+        record = gi_by_name.get(gi_name)
+        if food is None or record is None:
+            continue
+        food.gi = record.gi
+        food.gi_source = GI_SOURCE
+        mapped.add(gi_name)
+        attached += 1
+    return attached, mapped
+
+
 def import_foods(session: Session) -> dict[str, int]:
     by_code: dict[str, Food] = {}
     by_name: dict[str, Food] = {}
@@ -161,7 +195,11 @@ def import_foods(session: Session) -> dict[str, int]:
     attached = 0
     inserted = 0
     unmatched = [("gi_conflict", name, detail) for name, detail in conflicts]
+    seed_attached, mapped_gi_names = _attach_seed_gi(by_name, ready)
+    attached += seed_attached
     for record in ready:
+        if record.name in mapped_gi_names:
+            continue  # 已通过映射 attach 到演示主食，不再新建同名副本
         food = by_name.get(record.name)
         if food is None:
             food = Food(
