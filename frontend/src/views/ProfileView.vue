@@ -3,8 +3,34 @@
     <el-alert v-if="loadError" :title="loadError" type="error" show-icon :closable="false" />
     <el-button v-if="loadError" @click="load">重试</el-button>
     <template v-else-if="!loading">
-      <p v-if="isBlank" class="hint">还没有完整的健康档案，填写后保存。</p>
-      <el-steps :active="step" finish-status="success" align-center class="steps">
+      <template v-if="!editing && !isBlank">
+        <el-descriptions title="健康档案" :column="2" border class="profile-detail">
+          <el-descriptions-item label="性别">{{ form.gender || "—" }}</el-descriptions-item>
+          <el-descriptions-item label="出生年份">{{ form.birth_year ?? "—" }}</el-descriptions-item>
+          <el-descriptions-item label="年龄">{{ preview.age ?? "—" }}</el-descriptions-item>
+          <el-descriptions-item label="身高">{{ form.height_cm != null ? form.height_cm + " 厘米" : "—" }}</el-descriptions-item>
+          <el-descriptions-item label="体重">{{ form.weight_kg != null ? form.weight_kg + " 千克" : "—" }}</el-descriptions-item>
+          <el-descriptions-item label="BMI">{{ preview.bmi ?? "—" }}</el-descriptions-item>
+          <el-descriptions-item label="活动水平">{{ form.activity_level || "—" }}</el-descriptions-item>
+          <el-descriptions-item label="理想体重">{{ preview.ideal_weight_kg != null ? preview.ideal_weight_kg + " 千克" : "—" }}</el-descriptions-item>
+          <el-descriptions-item label="建议热量">{{ preview.suggested_kcal != null ? preview.suggested_kcal + " 千卡（估算）" : "—" }}</el-descriptions-item>
+          <el-descriptions-item label="疾病">{{ form.diseases.length ? form.diseases.join("、") : "无" }}</el-descriptions-item>
+          <el-descriptions-item label="过敏原">{{ form.allergies.length ? form.allergies.join("、") : "无" }}</el-descriptions-item>
+          <el-descriptions-item label="忌口">{{ form.dislikes.length ? form.dislikes.join("、") : "无" }}</el-descriptions-item>
+          <el-descriptions-item label="口味">{{ form.tastes.length ? form.tastes.join("、") : "无" }}</el-descriptions-item>
+          <el-descriptions-item label="菜系">{{ form.cuisines.length ? form.cuisines.join("、") : "无" }}</el-descriptions-item>
+          <el-descriptions-item label="空腹血糖">{{ form.fasting_glucose != null ? form.fasting_glucose + " mmol/L" : "未填写" }}（不参与推荐）</el-descriptions-item>
+          <el-descriptions-item label="糖化血红蛋白">{{ form.hba1c != null ? form.hba1c + " %" : "未填写" }}（不参与推荐）</el-descriptions-item>
+          <el-descriptions-item label="每日热量目标">{{ form.daily_kcal_target != null ? form.daily_kcal_target + " 千卡" : "—" }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="actions">
+          <el-button type="primary" @click="startEdit">编辑档案</el-button>
+        </div>
+      </template>
+      <template v-else>
+        <p v-if="isBlank" class="hint">还没有完整的健康档案，填写后保存。</p>
+        <p v-else class="hint">修改档案后保存。</p>
+        <el-steps :active="step" finish-status="success" align-center class="steps">
         <el-step title="基本信息" />
         <el-step title="疾病指标" />
         <el-step title="过敏忌口" />
@@ -141,7 +167,8 @@
           保存档案
         </el-button>
       </div>
-      <el-alert v-if="saveError" :title="saveError" type="error" show-icon :closable="false" />
+        <el-alert v-if="saveError" :title="saveError" type="error" show-icon :closable="false" />
+      </template>
     </template>
   </div>
 </template>
@@ -165,6 +192,7 @@ const saveError = ref("");
 const saving = ref(false);
 const step = ref(0);
 const isBlank = ref(true);
+const editing = ref(false);
 const formRef = ref<FormInstance>();
 const form = reactive({
   gender: "",
@@ -227,6 +255,17 @@ async function load() {
   try {
     const { data } = await fetchProfile();
     isBlank.value = data.birth_year == null || data.height_cm == null;
+    editing.value = isBlank.value;
+    Object.assign(preview, {
+      age: data.age,
+      bmi: data.bmi,
+      ideal_weight_kg: data.ideal_weight_kg,
+      suggested_kcal: data.suggested_kcal,
+      kcal_per_kg: data.kcal_per_kg,
+      kcal_source: data.kcal_source,
+      can_save: true,
+      block_message: null,
+    });
     form.gender = data.gender ?? "";
     form.birth_year = applyNumber(data.birth_year);
     form.height_cm = applyNumber(data.height_cm);
@@ -324,6 +363,11 @@ async function next() {
   step.value += 1;
 }
 
+function startEdit() {
+  step.value = 0;
+  editing.value = true;
+}
+
 function messageFrom(caught: unknown) {
   if (axios.isAxiosError(caught)) {
     const detail = caught.response?.data?.detail;
@@ -369,6 +413,7 @@ async function save() {
       daily_kcal_target: form.daily_kcal_target,
     });
     isBlank.value = false;
+    editing.value = false;
     Object.assign(preview, {
       age: data.age,
       bmi: data.bmi,
@@ -396,6 +441,10 @@ onMounted(() => {
 .hint {
   margin: 0 0 12px;
   color: #5c6b62;
+}
+
+.profile-detail {
+  margin-bottom: 16px;
 }
 
 .steps {
