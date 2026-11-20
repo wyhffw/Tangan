@@ -13,6 +13,7 @@ from app.models.entities import Food, FoodUnitConversion
 from app.services.food_catalog import (
     GI_SOURCE,
     NUTRIENT_SOURCE,
+    FoodRecord,
     composition_records,
     gi_records,
 )
@@ -22,6 +23,33 @@ RAW = ROOT / "data" / "raw"
 UNMATCHED = ROOT / "data" / "processed" / "unmatched.csv"
 COMPOSITION = RAW / "food-composition-v6-fixed-en.csv"
 GI_FILE = RAW / "glycemic-index-of-foods.json"
+
+# 演示食材简名 -> 成分表规范名。能精确同名（燕麦、糙米、荞麦、小米、胡萝卜、
+# 花生油）的走下方 import_foods 的 by_name 匹配，不在这里重复列。
+SEED_NAME_TO_COMPOSITION = {
+    "大米": "稻米（代表值）",
+    "玉米": "玉米（鲜）",
+    "红薯": "甘薯（红心）［山芋、红薯］",
+    "番茄": "番茄［西红柿］",
+    "黄瓜": "黄瓜（鲜）［胡瓜］",
+    "西兰花": "西兰花［绿菜花］",
+    "菠菜": "菠菜（鲜）［赤根菜］",
+    "大白菜": "大白菜（代表值）",
+    "香菇": "香菇（鲜）［香蕈，冬菇］",
+    "芹菜": "芹菜茎",
+    "鸡蛋": "鸡蛋（代表值）",
+    "鸡胸肉": "鸡胸脯肉",
+    "瘦猪肉": "猪肉（瘦）",
+    "牛肉": "牛肉（代表值，瘦，fat3g）",
+    "北豆腐": "豆腐（北豆腐）",
+    "南豆腐": "豆腐（南豆腐）",
+    "苹果": "苹果（代表值）",
+    "梨": "梨（代表值）",
+    "柚子": "柚［文旦］",
+    "草莓": "草莓［洋莓，凤阳草莓］",
+    "纯牛奶": "纯牛奶（代表值，全脂）",
+    "无糖酸奶": "酸奶（代表值，全脂）",
+}
 
 
 def _rows(path: Path) -> list[dict[str, str]]:
@@ -59,6 +87,31 @@ def write_unmatched(rows: list[tuple[str, str, str]]) -> None:
         writer.writerows(rows)
 
 
+def _fill_seed_nutrition(
+    by_name: dict[str, Food],
+    composition_by_name: dict[str, FoodRecord],
+) -> None:
+    """给演示食材按映射补齐成分表营养，保留友好的展示名。
+
+    演示食材用简名（如「番茄」），成分表用规范名（如「番茄［西红柿］」）。
+    这里只填营养数字，不写 food_code、不改 name，避免和完整成分表里的
+    规范名食物发生唯一键冲突。
+    """
+    for seed_name, comp_name in SEED_NAME_TO_COMPOSITION.items():
+        food = by_name.get(seed_name)
+        record = composition_by_name.get(comp_name)
+        if food is None or record is None:
+            continue
+        food.kcal = record.kcal
+        food.carb_g = record.carb_g
+        food.protein_g = record.protein_g
+        food.fat_g = record.fat_g
+        food.fiber_g = record.fiber_g
+        food.sodium_mg = record.sodium_mg
+        food.nutrient_source = NUTRIENT_SOURCE
+        food.per_g = Decimal(100)
+
+
 def import_foods(session: Session) -> dict[str, int]:
     by_code: dict[str, Food] = {}
     by_name: dict[str, Food] = {}
@@ -67,8 +120,11 @@ def import_foods(session: Session) -> dict[str, int]:
         if food.food_code:
             by_code[food.food_code] = food
 
+    records = composition_records(_rows(COMPOSITION))
+    _fill_seed_nutrition(by_name, {record.name: record for record in records})
+
     upserted = 0
-    for record in composition_records(_rows(COMPOSITION)):
+    for record in records:
         food = by_code.get(record.food_code) or by_name.get(record.name)
         if food is None:
             food = Food(name=record.name, alias=[], per_g=Decimal(100))
