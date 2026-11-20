@@ -87,29 +87,43 @@ def write_unmatched(rows: list[tuple[str, str, str]]) -> None:
         writer.writerows(rows)
 
 
-def _fill_seed_nutrition(
+def _apply_record(food: Food, record: FoodRecord) -> None:
+    """把成分表记录写进食物（food_code、别名、营养），不改 name。"""
+    food.food_code = record.food_code
+    food.category = record.category or food.category
+    food.alias = sorted({*(food.alias or []), *record.alias})
+    food.kcal = record.kcal
+    food.carb_g = record.carb_g
+    food.protein_g = record.protein_g
+    food.fat_g = record.fat_g
+    food.fiber_g = record.fiber_g
+    food.sodium_mg = record.sodium_mg
+    food.nutrient_source = NUTRIENT_SOURCE
+    food.per_g = Decimal(100)
+
+
+def _merge_seed_foods(
     by_name: dict[str, Food],
+    by_code: dict[str, Food],
     composition_by_name: dict[str, FoodRecord],
-) -> None:
-    """给演示食材按映射补齐成分表营养，保留友好的展示名。
+) -> set[str]:
+    """让演示食材简名食物直接承载成分表数据，不新建重复的规范名食物。
 
     演示食材用简名（如「番茄」），成分表用规范名（如「番茄［西红柿］」）。
-    这里只填营养数字，不写 food_code、不改 name，避免和完整成分表里的
-    规范名食物发生唯一键冲突。
+    把规范名的 food_code、别名和营养并进简名食物，name 保留简名；返回这些
+    规范名集合，供 upsert 阶段跳过，避免再插入一条重复记录。
     """
+    merged: set[str] = set()
     for seed_name, comp_name in SEED_NAME_TO_COMPOSITION.items():
         food = by_name.get(seed_name)
         record = composition_by_name.get(comp_name)
         if food is None or record is None:
             continue
-        food.kcal = record.kcal
-        food.carb_g = record.carb_g
-        food.protein_g = record.protein_g
-        food.fat_g = record.fat_g
-        food.fiber_g = record.fiber_g
-        food.sodium_mg = record.sodium_mg
-        food.nutrient_source = NUTRIENT_SOURCE
-        food.per_g = Decimal(100)
+        _apply_record(food, record)
+        by_code[record.food_code] = food
+        by_name[comp_name] = food
+        merged.add(comp_name)
+    return merged
 
 
 def import_foods(session: Session) -> dict[str, int]:
@@ -121,28 +135,21 @@ def import_foods(session: Session) -> dict[str, int]:
             by_code[food.food_code] = food
 
     records = composition_records(_rows(COMPOSITION))
-    _fill_seed_nutrition(by_name, {record.name: record for record in records})
+    composition_by_name = {record.name: record for record in records}
+    merged = _merge_seed_foods(by_name, by_code, composition_by_name)
 
     upserted = 0
     for record in records:
+        if record.name in merged:
+            continue  # 已并进演示食材简名食物，不再插入规范名副本
         food = by_code.get(record.food_code) or by_name.get(record.name)
         if food is None:
             food = Food(name=record.name, alias=[], per_g=Decimal(100))
             session.add(food)
         elif food.name != record.name:
             by_name.pop(food.name, None)
-        food.food_code = record.food_code
         food.name = record.name
-        food.category = record.category or food.category
-        food.alias = sorted({*(food.alias or []), *record.alias})
-        food.kcal = record.kcal
-        food.carb_g = record.carb_g
-        food.protein_g = record.protein_g
-        food.fat_g = record.fat_g
-        food.fiber_g = record.fiber_g
-        food.sodium_mg = record.sodium_mg
-        food.nutrient_source = NUTRIENT_SOURCE
-        food.per_g = Decimal(100)
+        _apply_record(food, record)
         by_code[record.food_code] = food
         by_name[record.name] = food
         upserted += 1
