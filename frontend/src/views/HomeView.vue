@@ -1,37 +1,73 @@
 <template>
-  <div>
-    <el-card class="block">
-      <template #header>服务状态</template>
-      <div v-loading="loading">
-        <el-alert v-if="error" type="error" :title="error" show-icon :closable="false" />
-        <el-empty v-else-if="!loading && rows.length === 0" description="还没有健康检查结果" />
-        <el-descriptions v-else :column="1" border>
-          <el-descriptions-item v-for="row in rows" :key="row.key" :label="row.label">
-            <el-tag :type="row.value === 'up' ? 'success' : 'info'">{{ row.value }}</el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
+  <div class="home">
+    <section class="hero">
+      <h1 class="hero-greeting">{{ greeting }}，{{ username }}</h1>
+      <p class="hero-sub">{{ heroSub }}</p>
+      <div v-if="hasProfile" class="hero-metrics">
+        <div class="metric">
+          <span class="metric-value">{{ profile?.bmi ?? "—" }}</span>
+          <span class="metric-label">BMI</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">{{ profile?.suggested_kcal ?? "—" }}</span>
+          <span class="metric-label">建议热量（千卡）</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">{{ profile?.ideal_weight_kg ?? "—" }}</span>
+          <span class="metric-label">理想体重（千克）</span>
+        </div>
       </div>
-    </el-card>
-    <el-card>
-      <template #header>临期食材</template>
+      <el-button v-else size="large" round class="hero-btn" @click="go('/profile')">
+        去完善健康档案
+      </el-button>
+    </section>
+
+    <section class="quick">
+      <div
+        v-for="item in quickLinks"
+        :key="item.path"
+        class="quick-card"
+        @click="go(item.path)"
+      >
+        <span class="quick-icon">{{ item.icon }}</span>
+        <span class="quick-title">{{ item.title }}</span>
+        <span class="quick-desc">{{ item.desc }}</span>
+      </div>
+    </section>
+
+    <el-card class="reminder">
+      <template #header>
+        <span class="reminder-header">冰箱提醒</span>
+      </template>
       <div v-loading="reminderLoading">
-        <el-alert v-if="reminderError" type="error" :title="reminderError" show-icon :closable="false" />
-        <el-button v-if="reminderError" @click="loadReminders">重试</el-button>
-        <el-empty
-          v-else-if="!reminderLoading && reminders.length === 0"
-          description="没有临期或过期的食材"
+        <el-alert
+          v-if="reminderError"
+          type="error"
+          :title="reminderError"
+          show-icon
+          :closable="false"
         />
-        <el-table v-else :data="reminders" border>
-          <el-table-column prop="food_name" label="食材" />
-          <el-table-column label="到期日" width="140">
-            <template #default="{ row }">{{ row.expires_at ?? "—" }}</template>
-          </el-table-column>
-          <el-table-column label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
+        <template v-else-if="reminders.length">
+          <el-alert
+            class="reminder-tip"
+            type="warning"
+            show-icon
+            :closable="false"
+            :title="reminderTip"
+          />
+          <el-table :data="reminders" border>
+            <el-table-column prop="food_name" label="食材" />
+            <el-table-column label="到期日" width="140">
+              <template #default="{ row }">{{ row.expires_at ?? "—" }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="120">
+              <template #default="{ row }">
+                <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+        <p v-else class="fresh">冰箱里的食材都很新鲜，不用着急。</p>
       </div>
     </el-card>
   </div>
@@ -39,62 +75,192 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
-import { fetchHealth, type HealthResponse } from "../api/health";
 import { fetchReminders, type InventoryItem } from "../api/inventory";
+import { fetchProfile, type ProfileView } from "../api/profile";
+import { useUserStore } from "../stores/user";
 import { statusLabel, statusType } from "../utils/inventoryStatus";
 
-const labels: Record<string, string> = {
-  postgresql: "数据库",
-  neo4j: "知识图谱",
-  chroma: "指南索引",
-  llm: "大模型",
-};
+const router = useRouter();
+const user = useUserStore();
 
-const loading = ref(true);
-const error = ref("");
-const health = ref<HealthResponse | null>(null);
+const profile = ref<ProfileView | null>(null);
+const reminders = ref<InventoryItem[]>([]);
 const reminderLoading = ref(true);
 const reminderError = ref("");
-const reminders = ref<InventoryItem[]>([]);
 
-const rows = computed(() => {
-  const components = health.value?.components ?? {};
-  return Object.entries(components).map(([key, value]) => ({
-    key,
-    label: labels[key] ?? key,
-    value,
-  }));
+const quickLinks = [
+  { path: "/recommend", icon: "🍽️", title: "今日推荐", desc: "看看今天吃什么" },
+  { path: "/chat", icon: "💬", title: "问一问", desc: "饮食疑问随时问" },
+  { path: "/fridge", icon: "🧊", title: "我的冰箱", desc: "冰箱里有什么" },
+  { path: "/profile", icon: "📋", title: "健康档案", desc: "查看身体状况" },
+];
+
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 6) return "夜深了";
+  if (hour < 9) return "早上好";
+  if (hour < 12) return "上午好";
+  if (hour < 14) return "中午好";
+  if (hour < 18) return "下午好";
+  return "晚上好";
 });
+
+const username = computed(() => user.username || "朋友");
+
+const hasProfile = computed(
+  () =>
+    profile.value != null &&
+    (profile.value.birth_year != null || profile.value.height_cm != null),
+);
+
+const heroSub = computed(() =>
+  hasProfile.value
+    ? "今天也要好好吃饭，我帮您搭配健康的一日三餐。"
+    : "填写健康档案后，我会根据您的情况推荐更合适的饭菜。",
+);
+
+const reminderTip = computed(
+  () => "有 " + reminders.value.length + " 样食材快到期了，记得早点吃。",
+);
+
+function go(path: string) {
+  void router.push(path);
+}
 
 async function loadReminders() {
   reminderLoading.value = true;
   reminderError.value = "";
   try {
-    const response = await fetchReminders();
-    reminders.value = response.data;
+    const { data } = await fetchReminders();
+    reminders.value = data;
   } catch {
-    reminderError.value = "暂时读不到临期食材";
+    reminderError.value = "暂时读不到冰箱信息";
   } finally {
     reminderLoading.value = false;
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   void loadReminders();
-  try {
-    const response = await fetchHealth();
-    health.value = response.data;
-  } catch {
-    error.value = "暂时连不上后端，请确认服务已在 127.0.0.1:8000 启动";
-  } finally {
-    loading.value = false;
-  }
+  void (async () => {
+    try {
+      const { data } = await fetchProfile();
+      profile.value = data;
+    } catch {
+      // 档案读不到不打断首页
+    }
+  })();
 });
 </script>
 
 <style scoped>
-.block {
-  margin-bottom: 16px;
+.home {
+  max-width: 960px;
+}
+
+.hero {
+  padding: 32px 36px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2f7d5b 0%, #45a06f 100%);
+  color: #fff;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(47, 125, 91, 0.25);
+}
+
+.hero-greeting {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.hero-sub {
+  margin: 0 0 22px;
+  font-size: 16px;
+  opacity: 0.92;
+}
+
+.hero-metrics {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-value {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.metric-label {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.hero-btn {
+  background: #fff;
+  color: #2f7d5b;
+  border: none;
+  font-weight: 600;
+}
+
+.quick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.quick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e8efe9;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.quick-icon {
+  font-size: 32px;
+}
+
+.quick-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #2c3a32;
+}
+
+.quick-desc {
+  font-size: 13px;
+  color: #8a9890;
+}
+
+.reminder-header {
+  font-weight: 600;
+}
+
+.reminder-tip {
+  margin-bottom: 12px;
+}
+
+.fresh {
+  margin: 0;
+  color: #6b7a72;
+  font-size: 15px;
 }
 </style>
