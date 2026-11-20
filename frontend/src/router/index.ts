@@ -10,6 +10,7 @@ import RecipeView from "../views/RecipeView.vue";
 import ReportView from "../views/ReportView.vue";
 import ShoppingView from "../views/ShoppingView.vue";
 import GraphView from "../views/GraphView.vue";
+import HealthView from "../views/HealthView.vue";
 import ChatView from "../views/ChatView.vue";
 import LlmConfigView from "../views/LlmConfigView.vue";
 
@@ -18,6 +19,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/register", component: AuthView, meta: { title: "注册", public: true } },
   { path: "/", name: "home", component: HomeView, meta: { title: "首页" } },
   { path: "/profile", component: ProfileView, meta: { title: "健康档案" } },
+  { path: "/health", component: HealthView, meta: { title: "健康趋势" } },
   { path: "/fridge", component: FridgeView, meta: { title: "我的冰箱" } },
   { path: "/recommend", component: RecommendView, meta: { title: "今日推荐" } },
   { path: "/recipe/:id", component: RecipeView, meta: { title: "食谱详情" } },

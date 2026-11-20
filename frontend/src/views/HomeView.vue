@@ -22,6 +22,51 @@
       </el-button>
     </section>
 
+    <el-card class="checkin">
+      <template #header>
+        <span class="reminder-header">今日健康打卡</span>
+      </template>
+      <el-form :inline="true" class="checkin-form">
+        <el-form-item label="体重 (kg)">
+          <el-input-number
+            v-model="checkin.weight_kg"
+            :min="20"
+            :max="300"
+            :precision="1"
+            :step="0.5"
+            controls-position="right"
+          />
+        </el-form-item>
+        <el-form-item label="空腹血糖 (mmol/L)">
+          <el-input-number
+            v-model="checkin.fasting_glucose"
+            :min="0.1"
+            :max="40"
+            :precision="1"
+            :step="0.1"
+            controls-position="right"
+          />
+        </el-form-item>
+        <el-form-item label="糖化血红蛋白 (%)">
+          <el-input-number
+            v-model="checkin.hba1c"
+            :min="0.1"
+            :max="30"
+            :precision="1"
+            :step="0.1"
+            controls-position="right"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="checkinSaving" @click="submitCheckin">
+            保存
+          </el-button>
+          <el-button link type="primary" @click="go('/health')">查看趋势 →</el-button>
+        </el-form-item>
+      </el-form>
+      <p v-if="checkinMessage" class="checkin-message">{{ checkinMessage }}</p>
+    </el-card>
+
     <section class="quick">
       <div
         v-for="item in quickLinks"
@@ -78,6 +123,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { fetchReminders, type InventoryItem } from "../api/inventory";
+import { saveMetric } from "../api/metrics";
 import { fetchProfile, type ProfileView } from "../api/profile";
 import { useUserStore } from "../stores/user";
 import { statusLabel, statusType } from "../utils/inventoryStatus";
@@ -124,6 +170,55 @@ const heroSub = computed(() =>
 const reminderTip = computed(
   () => "有 " + reminders.value.length + " 样食材快到期了，记得早点吃。",
 );
+
+const checkin = ref({
+  weight_kg: undefined as number | undefined,
+  fasting_glucose: undefined as number | undefined,
+  hba1c: undefined as number | undefined,
+});
+const checkinSaving = ref(false);
+const checkinMessage = ref("");
+
+function shanghaiToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+async function submitCheckin() {
+  const payload = {
+    date: shanghaiToday(),
+    weight_kg: checkin.value.weight_kg ?? null,
+    fasting_glucose: checkin.value.fasting_glucose ?? null,
+    hba1c: checkin.value.hba1c ?? null,
+  };
+  if (
+    payload.weight_kg == null &&
+    payload.fasting_glucose == null &&
+    payload.hba1c == null
+  ) {
+    checkinMessage.value = "请至少填一项";
+    return;
+  }
+  checkinSaving.value = true;
+  checkinMessage.value = "";
+  try {
+    await saveMetric(payload);
+    checkinMessage.value = "已保存今天的健康记录";
+    checkin.value = {
+      weight_kg: undefined,
+      fasting_glucose: undefined,
+      hba1c: undefined,
+    };
+  } catch {
+    checkinMessage.value = "保存失败，请稍后再试";
+  } finally {
+    checkinSaving.value = false;
+  }
+}
 
 function go(path: string) {
   void router.push(path);
@@ -252,6 +347,19 @@ onMounted(() => {
 
 .reminder-header {
   font-weight: 600;
+}
+
+.checkin {
+  margin-bottom: 20px;
+}
+
+.checkin-form {
+  align-items: center;
+}
+
+.checkin-message {
+  margin: 8px 0 0;
+  color: #2f7d5b;
 }
 
 .reminder-tip {

@@ -353,3 +353,26 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class HealthMetric(Base):
+    __tablename__ = "health_metrics"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "metric_date", "metric_type", name="uq_health_metric"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    metric_date: Mapped[date] = mapped_column(Date)
+    metric_type: Mapped[str] = mapped_column(String(32))
+    value: Mapped[Decimal] = mapped_column(Numeric(8, 2))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

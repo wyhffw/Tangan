@@ -12,6 +12,7 @@ from app.api.v1.graph import router as graph_router
 from app.api.v1.inventory import router as inventory_router
 from app.api.v1.llm_config import router as llm_config_router
 from app.api.v1.meal_plans import router as meal_plans_router
+from app.api.v1.metrics import router as metrics_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.recipes import router as recipes_router
 from app.api.v1.recommend import router as recommend_router
@@ -59,6 +60,7 @@ app.include_router(recipes_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(shopping_router, prefix="/api/v1")
 app.include_router(meal_plans_router, prefix="/api/v1")
+app.include_router(metrics_router, prefix="/api/v1")
 
 
 @app.exception_handler(AuthError)

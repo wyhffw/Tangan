@@ -10,6 +10,7 @@ from app.repositories.foods import find_food_by_name
 EXPECTED_TABLES = {
     "users",
     "health_profiles",
+    "health_metrics",
     "pending_profile_updates",
     "foods",
     "food_unit_conversions",
