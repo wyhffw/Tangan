@@ -52,16 +52,16 @@ def check_chroma() -> str:
 
 
 def check_llm() -> str:
-    settings = get_settings()
-    if not settings.llm_api_key:
+    from app.core.llm_config import get_llm_config
+
+    cfg = get_llm_config(get_settings())
+    if not cfg["api_key"]:
         return "down"
     from openai import OpenAI
 
-    from app.core.llm import resolve_cloud_base_url
-
     client = OpenAI(
-        api_key=settings.llm_api_key,
-        base_url=resolve_cloud_base_url(settings),
+        api_key=cfg["api_key"],
+        base_url=cfg["base_url"],
         timeout=2,
     )
     client.models.list()

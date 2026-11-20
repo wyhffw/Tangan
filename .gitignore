@@ -22,6 +22,9 @@ htmlcov/
 # 向量库
 backend/data/chroma/
 
+# 网页端配置的大模型 Key
+backend/data/llm_config.json
+
 # 前端
 frontend/node_modules/
 frontend/dist/

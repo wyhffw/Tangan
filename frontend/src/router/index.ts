@@ -11,6 +11,7 @@ import ReportView from "../views/ReportView.vue";
 import ShoppingView from "../views/ShoppingView.vue";
 import GraphView from "../views/GraphView.vue";
 import ChatView from "../views/ChatView.vue";
+import LlmConfigView from "../views/LlmConfigView.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/login", component: AuthView, meta: { title: "登录", public: true } },
@@ -24,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/shopping", component: ShoppingView, meta: { title: "购物清单" } },
   { path: "/chat", component: ChatView, meta: { title: "问答" } },
   { path: "/graph", component: GraphView, meta: { title: "知识图谱" } },
+  { path: "/llm", component: LlmConfigView, meta: { title: "大模型设置" } },
 ];
 
 export function attachAuthGuard(router: Router) {

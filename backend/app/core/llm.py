@@ -58,10 +58,20 @@ def generate(
     cloud_complete: Completer | None = None,
     ollama_complete: Completer | None = None,
 ) -> str:
+    explicit_settings = settings is not None
     settings = settings or get_settings()
 
     def default_cloud(msgs: Sequence[Message]) -> str:
-        return _complete(cloud_client(settings), settings.llm_model, msgs)
+        if explicit_settings:
+            client = cloud_client(settings)
+            model = settings.llm_model
+        else:
+            from app.core.llm_config import get_llm_config
+
+            cfg = get_llm_config(settings)
+            client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"], timeout=30)
+            model = cfg["model"]
+        return _complete(client, model, msgs)
 
     def default_ollama(msgs: Sequence[Message]) -> str:
         return _complete(ollama_client(settings), settings.ollama_model, msgs)

@@ -15,6 +15,7 @@
         <el-menu-item index="/shopping">购物清单</el-menu-item>
         <el-menu-item index="/chat">问答</el-menu-item>
         <el-menu-item index="/graph">知识图谱</el-menu-item>
+        <el-menu-item index="/llm">大模型设置</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

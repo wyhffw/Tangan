@@ -10,6 +10,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.graph import router as graph_router
 from app.api.v1.inventory import router as inventory_router
+from app.api.v1.llm_config import router as llm_config_router
 from app.api.v1.meal_plans import router as meal_plans_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.recipes import router as recipes_router
@@ -52,6 +53,7 @@ app.include_router(chat_router, prefix="/api/v1")
 app.include_router(graph_router, prefix="/api/v1")
 app.include_router(profile_router, prefix="/api/v1")
 app.include_router(inventory_router, prefix="/api/v1")
+app.include_router(llm_config_router, prefix="/api/v1")
 app.include_router(recommend_router, prefix="/api/v1")
 app.include_router(recipes_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
