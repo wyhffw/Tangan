@@ -232,6 +232,31 @@ class MealPlan(Base):
     )
 
 
+class MealFoodItem(Base):
+    """自定义配餐条目：自选食材 + 份量，按成分表算营养。"""
+
+    __tablename__ = "meal_food_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "date", "meal_type", "food_id", name="uq_meal_food_slot"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date)
+    meal_type: Mapped[str] = mapped_column(String(16))
+    food_id: Mapped[int] = mapped_column(
+        ForeignKey("foods.id", ondelete="RESTRICT"), index=True
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    unit: Mapped[str] = mapped_column(String(32))
+
+    food: Mapped[Food] = relationship()
+
+
 class ShoppingList(Base):
     __tablename__ = "shopping_lists"
 
@@ -375,4 +400,20 @@ class HealthMetric(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ReportRecipient(Base):
+    __tablename__ = "report_recipients"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(255))
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )

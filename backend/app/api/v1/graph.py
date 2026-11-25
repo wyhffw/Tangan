@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_session
 from app.models.entities import User
-from app.schemas.graph import FoodFacts, Neighborhood
-from app.services.graph import read_food_facts, read_neighbors
+from app.schemas.graph import DiseaseGuidanceView, FoodFacts, Neighborhood
+from app.services.graph import read_disease_guidance, read_food_facts, read_neighbors
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
@@ -30,3 +30,11 @@ def food_facts(
     session: Annotated[Session, Depends(get_session)],
 ) -> FoodFacts:
     return FoodFacts.model_validate(read_food_facts(session, pg_id))
+
+
+@router.get("/guidance", response_model=DiseaseGuidanceView)
+def guidance(
+    _user: Annotated[User, Depends(get_current_user)],
+    name: Annotated[str, Query(max_length=64)] = "",
+) -> DiseaseGuidanceView:
+    return DiseaseGuidanceView.model_validate(read_disease_guidance(name))

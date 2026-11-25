@@ -5,8 +5,13 @@ from decimal import Decimal
 from neo4j.exceptions import Neo4jError
 from sqlalchemy.orm import Session
 
-from app.graph.queries import GraphNode, GraphQueryError, neighborhood
-from app.graph.sync import GraphUnavailable, neo4j_driver
+from app.graph.queries import (
+    GraphNode,
+    GraphQueryError,
+    disease_guidance,
+    neighborhood,
+)
+from app.graph.sync import GraphUnavailable, load_notes, neo4j_driver
 from app.repositories.inventory import get_food
 
 
@@ -72,8 +77,82 @@ def read_food_facts(session: Session, pg_id: int) -> dict[str, object]:
     }
 
 
+def read_disease_guidance(name: str) -> dict[str, object]:
+    """疾病饮食指导：注意事项 + 该吃 / 不该吃 / 限量 / 避免做法。"""
+    cleaned = name.strip()
+    if not cleaned:
+        raise GraphError(status_code=422, detail="请输入疾病名称", code="name_required")
+    try:
+        driver = neo4j_driver()
+    except GraphUnavailable:
+        return _guidance_down()
+    try:
+        driver.verify_connectivity()
+        guidance = disease_guidance(driver, cleaned)
+    except (OSError, GraphUnavailable, Neo4jError, GraphQueryError):
+        return _guidance_down()
+    finally:
+        driver.close()
+    notes = [n for n in load_notes() if n.disease == cleaned]
+    has_guidance = bool(
+        guidance.recommended
+        or guidance.avoided
+        or guidance.limits
+        or guidance.avoided_methods
+    )
+    if not has_guidance and not notes:
+        return {
+            "graph": "up",
+            "disease": None,
+            "notes": [],
+            "recommended": [],
+            "avoided": [],
+            "limits": [],
+            "avoided_methods": [],
+        }
+    return {
+        "graph": "up",
+        "disease": cleaned,
+        "notes": [{"note": n.note, "source": n.source} for n in notes],
+        "recommended": [
+            {"name": f.name, "reason": f.reason, "source": f.source}
+            for f in guidance.recommended
+        ],
+        "avoided": [
+            {"name": f.name, "reason": f.reason, "source": f.source}
+            for f in guidance.avoided
+        ],
+        "limits": [
+            {
+                "name": l.name,
+                "max_per_day": l.max_per_day,
+                "unit": l.unit,
+                "reason": l.reason,
+                "source": l.source,
+            }
+            for l in guidance.limits
+        ],
+        "avoided_methods": [
+            {"name": m.name, "reason": m.reason, "source": m.source}
+            for m in guidance.avoided_methods
+        ],
+    }
+
+
 def _down() -> dict[str, object]:
     return {"graph": "down", "center": None, "nodes": [], "links": []}
+
+
+def _guidance_down() -> dict[str, object]:
+    return {
+        "graph": "down",
+        "disease": None,
+        "notes": [],
+        "recommended": [],
+        "avoided": [],
+        "limits": [],
+        "avoided_methods": [],
+    }
 
 
 def _node(item: GraphNode) -> dict[str, object]:

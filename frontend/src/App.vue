@@ -11,11 +11,10 @@
         <el-menu-item index="/profile">健康档案</el-menu-item>
         <el-menu-item index="/fridge">我的冰箱</el-menu-item>
         <el-menu-item index="/recommend">今日推荐</el-menu-item>
+        <el-menu-item index="/meal-plan">我的清单</el-menu-item>
         <el-menu-item index="/report">营养报告</el-menu-item>
+        <el-menu-item index="/report-email">转发给家人</el-menu-item>
         <el-menu-item index="/shopping">购物清单</el-menu-item>
-        <el-menu-item index="/chat">问答</el-menu-item>
-        <el-menu-item index="/graph">知识图谱</el-menu-item>
-        <el-menu-item index="/llm">大模型设置</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -33,6 +32,7 @@
         <DisclaimerFooter />
       </el-footer>
     </el-container>
+    <PetAssistant />
   </el-container>
 </template>
 
@@ -41,6 +41,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import DisclaimerFooter from "./components/DisclaimerFooter.vue";
+import PetAssistant from "./components/pet/PetAssistant.vue";
 import { useUserStore } from "./stores/user";
 
 const route = useRoute();

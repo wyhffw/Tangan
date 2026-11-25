@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Route = Literal["knowledge", "recommend", "report", "profile_update", "blocked"]
+Route = Literal["knowledge", "recommend", "report", "profile_update", "help", "blocked"]
 
 
 class ChatRequest(BaseModel):

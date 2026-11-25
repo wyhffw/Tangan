@@ -168,3 +168,49 @@ def _number(value: Decimal | None) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def list_recipes(
+    session: Session,
+    q: str | None = None,
+    meal_type: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, object]:
+    """菜谱库列表。按名称子串和餐次过滤，营养数字由后端计算。"""
+    recipes = list(session.scalars(select(Recipe).order_by(Recipe.id)))
+    needle = (q or "").strip()
+    if needle:
+        recipes = [recipe for recipe in recipes if needle in recipe.name]
+    if meal_type:
+        recipes = [
+            recipe for recipe in recipes if meal_type in (recipe.meal_types or [])
+        ]
+    total = len(recipes)
+    start = max(0, (page - 1) * page_size)
+    window = recipes[start : start + page_size]
+    items: list[dict[str, object]] = []
+    for recipe in window:
+        nutrition = recipe_nutrition(session, recipe)
+        items.append(
+            {
+                "id": recipe.id,
+                "name": recipe.name,
+                "cuisine": recipe.cuisine,
+                "meal_types": list(recipe.meal_types or []),
+                "cooking_method": recipe.cooking_method,
+                "servings": float(recipe.servings or Decimal(1)),
+                "image_url": recipe.image_url,
+                "kcal": _number(nutrition.kcal),
+                "carb_g": _number(nutrition.carb_g),
+                "protein_g": _number(nutrition.protein_g),
+                "fat_g": _number(nutrition.fat_g),
+                "gi_band_label": nutrition.gi_band_label,
+            }
+        )
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }

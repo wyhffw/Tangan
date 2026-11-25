@@ -6,13 +6,12 @@ import AuthView from "../views/AuthView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import FridgeView from "../views/FridgeView.vue";
 import RecommendView from "../views/RecommendView.vue";
+import MealPlanView from "../views/MealPlanView.vue";
 import RecipeView from "../views/RecipeView.vue";
 import ReportView from "../views/ReportView.vue";
+import EmailForwardView from "../views/EmailForwardView.vue";
 import ShoppingView from "../views/ShoppingView.vue";
-import GraphView from "../views/GraphView.vue";
 import HealthView from "../views/HealthView.vue";
-import ChatView from "../views/ChatView.vue";
-import LlmConfigView from "../views/LlmConfigView.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/login", component: AuthView, meta: { title: "登录", public: true } },
@@ -22,12 +21,11 @@ export const routes: RouteRecordRaw[] = [
   { path: "/health", component: HealthView, meta: { title: "健康趋势" } },
   { path: "/fridge", component: FridgeView, meta: { title: "我的冰箱" } },
   { path: "/recommend", component: RecommendView, meta: { title: "今日推荐" } },
+  { path: "/meal-plan", component: MealPlanView, meta: { title: "我的清单" } },
   { path: "/recipe/:id", component: RecipeView, meta: { title: "食谱详情" } },
   { path: "/report", component: ReportView, meta: { title: "营养报告" } },
+  { path: "/report-email", component: EmailForwardView, meta: { title: "转发给家人" } },
   { path: "/shopping", component: ShoppingView, meta: { title: "购物清单" } },
-  { path: "/chat", component: ChatView, meta: { title: "问答" } },
-  { path: "/graph", component: GraphView, meta: { title: "知识图谱" } },
-  { path: "/llm", component: LlmConfigView, meta: { title: "大模型设置" } },
 ];
 
 export function attachAuthGuard(router: Router) {

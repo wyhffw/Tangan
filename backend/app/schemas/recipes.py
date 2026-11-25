@@ -46,3 +46,25 @@ class RecipeDetail(BaseModel):
     gi_band_source: str
     gl_estimate: float | None
     gl_is_approximate: bool
+
+
+class RecipeSummary(BaseModel):
+    id: int
+    name: str
+    cuisine: str | None
+    meal_types: list[str]
+    cooking_method: str | None
+    servings: float
+    image_url: str | None
+    kcal: float | None
+    carb_g: float | None
+    protein_g: float | None
+    fat_g: float | None
+    gi_band_label: str | None
+
+
+class RecipeList(BaseModel):
+    items: list[RecipeSummary]
+    total: int
+    page: int
+    page_size: int

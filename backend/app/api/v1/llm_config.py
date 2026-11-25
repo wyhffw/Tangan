@@ -11,6 +11,7 @@ from app.core.llm_config import (
     normalize_provider,
     save_llm_config,
 )
+from app.core.config import get_settings
 from app.models.entities import User
 from app.schemas.llm_config import LlmConfigIn, LlmConfigOut, LlmTestResult
 
@@ -52,14 +53,17 @@ def test_config(
 ) -> LlmTestResult:
     current = get_llm_config()
     provider = normalize_provider(payload.provider or current["provider"])
-    api_key = (payload.api_key or "").strip() or current["api_key"]
-    base_url = (
-        (payload.base_url or "").strip()
-        or PROVIDER_BASE_URLS[provider]
-    )
-    model = (payload.model or "").strip() or PROVIDER_DEFAULT_MODELS[provider]
-    if not api_key:
-        return LlmTestResult(ok=False, message="请先填写 API Key")
+    if provider == "ollama":
+        settings = get_settings()
+        api_key = "ollama"
+        base_url = (payload.base_url or "").strip() or settings.ollama_base_url
+        model = (payload.model or "").strip() or settings.ollama_model
+    else:
+        api_key = (payload.api_key or "").strip() or current["api_key"]
+        base_url = (payload.base_url or "").strip() or PROVIDER_BASE_URLS[provider]
+        model = (payload.model or "").strip() or PROVIDER_DEFAULT_MODELS[provider]
+        if not api_key:
+            return LlmTestResult(ok=False, message="请先填写 API Key")
 
     from openai import OpenAI
 

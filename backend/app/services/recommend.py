@@ -24,7 +24,9 @@ from app.rag.embeddings import embed_texts
 from app.rag.retrieve import search_guidelines
 from app.rag.vectorstore import chroma_directory, get_collection, open_client
 from app.repositories.profiles import get_by_user_id
-from app.services.inventory import list_inventory
+from app.repositories.metrics import list_between
+from app.services.inventory import list_inventory, today_in_app_tz
+from app.services.meal_plans import list_plans
 from app.services.nutrition import age_in_year, current_year
 from app.services.recipe_nutrition import (
     IngredientLine,
@@ -51,13 +53,56 @@ def recommend_for_user(
     only_inventory: bool,
     exclude_ids: list[int],
 ) -> dict[str, object]:
-    return run_recommend(
+    result = run_recommend(
         default_deps(session),
         user_id=user_id,
         meal_type=meal_type,
         only_inventory=only_inventory,
         exclude_ids=exclude_ids,
     )
+    _apply_meal_food_totals(session, user_id, result)
+    return result
+
+
+def _apply_meal_food_totals(
+    session: Session,
+    user_id: int,
+    result: dict[str, object],
+) -> None:
+    """推荐接口与我的清单共用同一份食材数据：目标/已摄入/剩余都取全天。"""
+    from app.services.meal_foods import food_summary
+
+    summary = food_summary(session, user_id)
+    daily = summary.get("daily_targets")
+    totals = summary.get("consumed") or {}
+    items = summary.get("items") or []
+    if daily:
+        result["meal_targets"] = {
+            "meal_type": "全天",
+            "kcal": daily["daily_kcal"],
+            "carb_g": daily["carb_g"],
+            "protein_g": daily["protein_g"],
+            "fat_g": daily["fat_g"],
+        }
+    result["consumed"] = {
+        "items": [
+            {
+                "recipe_id": int(item["food_id"]),
+                "name": str(item["food_name"]),
+                "meal_type": str(item["meal_type"]),
+                "kcal": item.get("kcal"),
+                "carb_g": item.get("carb_g"),
+                "protein_g": item.get("protein_g"),
+                "fat_g": item.get("fat_g"),
+            }
+            for item in items
+        ],
+        "kcal": totals.get("kcal"),
+        "carb_g": totals.get("carb_g"),
+        "protein_g": totals.get("protein_g"),
+        "fat_g": totals.get("fat_g"),
+    }
+    result["remaining"] = summary.get("remaining")
 
 
 def default_deps(session: Session) -> RecommendDeps:
@@ -68,6 +113,7 @@ def default_deps(session: Session) -> RecommendDeps:
         load_profile=lambda user_id: _profile(session, user_id),
         load_inventory=lambda user_id: _stock(session, user_id),
         load_recipes=lambda: _recipes(session, by_id),
+        load_plan=lambda user_id: _plan(session, user_id),
         graph_foods=_graph_foods,
         retrieve=_retrieve,
         oil_table=load_cooking_oil(),
@@ -82,12 +128,37 @@ def _profile(session: Session, user_id: int) -> dict[str, object]:
     profile = get_by_user_id(session, user_id)
     if profile is None:
         raise RecommendDataError(status_code=422, detail="请先填写健康档案", code="profile_missing")
+    metrics = _today_metrics(session, user_id)
     return {
         "diseases": list(profile.diseases or []),
         "allergies": list(profile.allergies or []),
         "dislikes": list(profile.dislikes or []),
         "age": _age(profile),
+        "height_cm": profile.height_cm,
+        "weight_kg": metrics["weight_kg"]
+        if metrics["weight_kg"] is not None
+        else profile.weight_kg,
+        "activity_level": profile.activity_level,
+        "fasting_glucose": metrics["fasting_glucose"],
+        "hba1c": metrics["hba1c"],
     }
+
+
+def _today_metrics(session: Session, user_id: int) -> dict[str, object]:
+    """读今日健康指标，今日没有记录时该字段为 None（由档案兜底）。"""
+    today = today_in_app_tz()
+    rows = list_between(session, user_id, today, today)
+    values = {row.metric_type: row.value for row in rows}
+    return {
+        "weight_kg": values.get("weight_kg"),
+        "fasting_glucose": values.get("fasting_glucose"),
+        "hba1c": values.get("hba1c"),
+    }
+
+
+def _plan(session: Session, user_id: int) -> list[dict[str, object]]:
+    """读今日已加入计划的菜，供推荐排除和计算剩余预算。"""
+    return list_plans(session, user_id, today_in_app_tz())
 
 
 def _age(profile: HealthProfile) -> int | None:

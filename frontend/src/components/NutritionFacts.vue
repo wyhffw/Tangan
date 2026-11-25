@@ -7,7 +7,7 @@
       <el-descriptions-item label="脂肪">{{ formatAmount(facts.fat_g) }} g</el-descriptions-item>
       <el-descriptions-item label="膳食纤维">{{ formatAmount(facts.fiber_g) }} g</el-descriptions-item>
       <el-descriptions-item label="钠">{{ formatAmount(facts.sodium_mg) }} mg</el-descriptions-item>
-      <el-descriptions-item label="主食 GI">{{ giText(facts) }}</el-descriptions-item>
+      <el-descriptions-item label="GI">{{ giText(facts) }}</el-descriptions-item>
       <el-descriptions-item label="GL">{{ glText(facts) }}</el-descriptions-item>
     </el-descriptions>
     <p v-if="facts.oil_estimated" class="hint">烹调油为估算</p>

@@ -45,3 +45,36 @@ export function fetchNeighbors(name: string, depth: number) {
 export function fetchFoodFacts(pgId: number) {
   return http.get<FoodFacts>(`/api/v1/graph/foods/${pgId}`);
 }
+
+export interface GuidanceFood {
+  name: string;
+  reason: string | null;
+  source: string | null;
+}
+
+export interface GuidanceLimit {
+  name: string;
+  max_per_day: number | null;
+  unit: string | null;
+  reason: string | null;
+  source: string | null;
+}
+
+export interface DiseaseNote {
+  note: string;
+  source: string;
+}
+
+export interface DiseaseGuidance {
+  graph: string;
+  disease: string | null;
+  notes: DiseaseNote[];
+  recommended: GuidanceFood[];
+  avoided: GuidanceFood[];
+  limits: GuidanceLimit[];
+  avoided_methods: GuidanceFood[];
+}
+
+export function fetchGuidance(name: string) {
+  return http.get<DiseaseGuidance>("/api/v1/graph/guidance", { params: { name } });
+}

@@ -1,6 +1,6 @@
 import http from "./http";
 
-export type ChatRoute = "knowledge" | "recommend" | "report" | "profile_update" | "blocked";
+export type ChatRoute = "knowledge" | "recommend" | "report" | "profile_update" | "help" | "blocked";
 
 export interface ChatSource {
   chunk_id: string;

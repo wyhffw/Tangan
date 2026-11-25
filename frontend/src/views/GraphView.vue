@@ -1,70 +1,113 @@
 <template>
-  <div>
+  <div class="page">
     <div class="toolbar">
-      <el-input v-model="name" placeholder="食材或疾病，例如荞麦、2型糖尿病" @keyup.enter="search" />
-      <el-radio-group v-model="depth">
-        <el-radio :value="1">一度</el-radio>
-        <el-radio :value="2">二度</el-radio>
-      </el-radio-group>
+      <el-input
+        v-model="name"
+        class="search-input"
+        placeholder="输入疾病，例如 2型糖尿病"
+        clearable
+        @keyup.enter="search"
+      />
       <el-button type="primary" :disabled="loading" @click="search">查询</el-button>
     </div>
 
-    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
-    <el-button v-if="error" @click="search">重试</el-button>
-    <p v-else-if="loading">加载中</p>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" class="block" />
+    <p v-if="loading" class="hint">加载中…</p>
 
-    <template v-else-if="result">
+    <template v-else-if="guidance">
       <el-alert
-        v-if="result.graph !== 'up'"
+        v-if="guidance.graph !== 'up'"
         title="图谱暂时不可用"
         type="info"
         show-icon
         :closable="false"
+        class="block"
       />
-      <el-empty v-else-if="result.nodes.length === 0" description="没有找到这个食材或疾病" />
-      <template v-else>
-        <div ref="chartEl" class="chart" />
-        <ul class="links">
-          <li v-for="(link, index) in result.links" :key="index">
-            <button type="button" @click="openNode(link.source)">{{ nodeName(link.source) }}</button>
-            {{ relationText(link.relation) }}
-            <button type="button" @click="openNode(link.target)">{{ nodeName(link.target) }}</button>
-            <span v-if="link.citation" class="citation">{{ link.citation }}</span>
-          </li>
-        </ul>
+
+      <template v-else-if="guidance.disease">
+        <h2 class="disease-name">{{ guidance.disease }} · 饮食指导</h2>
+
+        <el-card v-if="guidance.notes.length" class="block" shadow="never">
+          <template #header><span class="card-title">注意事项</span></template>
+          <ol class="notes">
+            <li v-for="(note, index) in guidance.notes" :key="index">{{ note.note }}</li>
+          </ol>
+        </el-card>
+
+        <div class="grid">
+          <el-card class="col" shadow="never">
+            <template #header><span class="card-title good">该吃</span></template>
+            <div v-if="guidance.recommended.length" class="tag-cloud">
+              <el-tag v-for="food in guidance.recommended" :key="food.name" type="success" effect="plain">
+                {{ food.name }}
+              </el-tag>
+            </div>
+            <el-empty v-else description="暂无" :image-size="50" />
+          </el-card>
+
+          <el-card class="col" shadow="never">
+            <template #header><span class="card-title bad">不该吃</span></template>
+            <div v-if="guidance.avoided.length" class="tag-cloud">
+              <el-tag v-for="food in guidance.avoided" :key="food.name" type="danger" effect="plain">
+                {{ food.name }}
+              </el-tag>
+            </div>
+            <el-empty v-else description="暂无" :image-size="50" />
+          </el-card>
+        </div>
+
+        <el-card v-if="guidance.limits.length" class="block" shadow="never">
+          <template #header><span class="card-title">要限量</span></template>
+          <ul class="limit-list">
+            <li v-for="limit in guidance.limits" :key="limit.name">
+              <span class="limit-name">{{ limit.name }}</span>
+              <el-tag v-if="limit.max_per_day != null" type="warning" effect="plain">
+                每天不超过 {{ limit.max_per_day }} {{ limit.unit }}
+              </el-tag>
+              <el-tag v-else type="warning" effect="plain">尽量少吃</el-tag>
+            </li>
+          </ul>
+        </el-card>
+
+        <el-card v-if="guidance.avoided_methods.length" class="block" shadow="never">
+          <template #header><span class="card-title">避免的做法</span></template>
+          <div class="tag-cloud">
+            <el-tag v-for="method in guidance.avoided_methods" :key="method.name" type="info" effect="plain">
+              {{ method.name }}
+            </el-tag>
+          </div>
+        </el-card>
+
+        <p class="disclaimer">内容依据成人糖尿病食养指南（2023年版）整理，仅供参考，不构成医疗建议。</p>
       </template>
-      <section v-if="facts" class="facts">
-        <h3>{{ facts.name }}</h3>
-        <p>数字来自成分表，不写在图谱节点上。</p>
-        <p>GI {{ facts.gi == null ? "—" : facts.gi }}（{{ facts.gi_source }}）</p>
-        <p>每 {{ facts.per_g ?? "—" }} 克：热量 {{ amount(facts.kcal) }} kcal，碳水 {{ amount(facts.carb_g) }} g</p>
-        <p>蛋白质 {{ amount(facts.protein_g) }} g，脂肪 {{ amount(facts.fat_g) }} g，膳食纤维 {{ amount(facts.fiber_g) }} g</p>
-        <p>钠 {{ amount(facts.sodium_mg) }} mg。营养来源：{{ facts.nutrient_source }}</p>
-      </section>
-      <p v-else-if="factsNote">{{ factsNote }}</p>
+
+      <template v-else-if="neighbors && neighbors.center">
+        <h2 class="disease-name">{{ neighbors.center.name }} · 相关关系</h2>
+        <el-card class="block" shadow="never">
+          <ul v-if="neighbors.links.length" class="relation-list">
+            <li v-for="(link, index) in neighbors.links" :key="index">
+              <span class="rel-name">{{ nodeName(link.source) }}</span>
+              <el-tag size="small" effect="plain">{{ relationText(link.relation) }}</el-tag>
+              <span class="rel-name">{{ nodeName(link.target) }}</span>
+            </li>
+          </ul>
+          <el-empty v-else description="这个食材暂时没有图谱关系" :image-size="50" />
+        </el-card>
+      </template>
+
+      <el-empty v-else description="没找到这个疾病或食材的指导信息" class="block" />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
-import type { EChartsType } from "echarts";
-
+import { ref } from "vue";
 import {
-  fetchFoodFacts,
+  fetchGuidance,
   fetchNeighbors,
-  type FoodFacts,
-  type GraphNode,
+  type DiseaseGuidance,
   type Neighborhood,
 } from "../api/graph";
-
-const labelNames: Record<string, string> = {
-  Food: "食材",
-  Disease: "疾病",
-  Recipe: "食谱",
-  CookingMethod: "做法",
-  Nutrient: "营养素",
-};
 
 const relationNames: Record<string, string> = {
   RECOMMEND: "推荐",
@@ -76,142 +119,50 @@ const relationNames: Record<string, string> = {
   SUBSTITUTE: "可替换",
 };
 
-const categoryColors = ["#2f7d4a", "#c45656", "#3a7ca5", "#c48a2a", "#6b5b95"];
-
-const name = ref("");
-const depth = ref(2);
+const name = ref("2型糖尿病");
 const loading = ref(false);
 const error = ref("");
-const result = ref<Neighborhood | null>(null);
-const facts = ref<FoodFacts | null>(null);
-const factsNote = ref("");
-const chartEl = ref<HTMLDivElement | null>(null);
-const chart = shallowRef<EChartsType | null>(null);
-let ticket = 0;
-
-function amount(value: number | null): string {
-  if (value == null) {
-    return "—";
-  }
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
+const guidance = ref<DiseaseGuidance | null>(null);
+const neighbors = ref<Neighborhood | null>(null);
 
 function relationText(relation: string): string {
   return relationNames[relation] ?? relation;
 }
 
 function nodeName(id: string): string {
-  return result.value?.nodes.find((item) => item.id === id)?.name ?? id;
-}
-
-function openNode(id: string) {
-  const node = result.value?.nodes.find((item) => item.id === id);
-  if (!node) {
-    return;
-  }
-  void loadFacts(node);
-}
-
-async function loadFacts(node: GraphNode) {
-  facts.value = null;
-  factsNote.value = "";
-  if (node.label !== "Food") {
-    factsNote.value = `${node.name}不是食材，这里不显示营养数字。`;
-    return;
-  }
-  if (node.pg_id == null) {
-    factsNote.value = "图谱里没有对应的成分表编号，不显示营养数字。";
-    return;
-  }
-  try {
-    const response = await fetchFoodFacts(node.pg_id);
-    facts.value = response.data;
-  } catch {
-    factsNote.value = "成分表暂时读不出来。";
-  }
-}
-
-async function paint() {
-  chart.value?.dispose();
-  chart.value = null;
-  await nextTick();
-  if (!chartEl.value || !result.value || result.value.graph !== "up" || result.value.nodes.length === 0) {
-    return;
-  }
-  const echarts = await import("echarts");
-  const categories = Object.values(labelNames);
-  const instance = echarts.init(chartEl.value);
-  instance.setOption({
-    tooltip: {},
-    legend: [{ data: categories }],
-    series: [
-      {
-        type: "graph",
-        layout: "force",
-        roam: true,
-        categories: categories.map((item, index) => ({
-          name: item,
-          itemStyle: { color: categoryColors[index] },
-        })),
-        data: result.value.nodes.map((node) => ({
-          id: node.id,
-          name: node.name,
-          category: Math.max(Object.keys(labelNames).indexOf(node.label), 0),
-          label: node.label,
-          pg_id: node.pg_id,
-        })),
-        links: result.value.links.map((link) => ({
-          source: link.source,
-          target: link.target,
-        })),
-        force: { repulsion: 220, edgeLength: 110 },
-      },
-    ],
-  });
-  instance.on("click", (params) => {
-    if (params.dataType !== "node" || !params.data) {
-      return;
-    }
-    void loadFacts(params.data as unknown as GraphNode);
-  });
-  chart.value = instance;
+  return neighbors.value?.nodes.find((item) => item.id === id)?.name ?? id;
 }
 
 async function search() {
-  const current = ++ticket;
-  const selectedName = name.value.trim();
-  const selectedDepth = depth.value;
-  if (!selectedName) {
-    error.value = "请输入食材或疾病";
+  const query = name.value.trim();
+  if (!query) {
+    error.value = "请输入疾病或食材";
     return;
   }
   loading.value = true;
   error.value = "";
-  facts.value = null;
-  factsNote.value = "";
+  guidance.value = null;
+  neighbors.value = null;
   try {
-    const response = await fetchNeighbors(selectedName, selectedDepth);
-    if (current !== ticket) {
-      return;
+    const response = await fetchGuidance(query);
+    guidance.value = response.data;
+    if (response.data.graph === "up" && !response.data.disease) {
+      const neighborResponse = await fetchNeighbors(query, 1);
+      neighbors.value = neighborResponse.data;
     }
-    result.value = response.data;
-    loading.value = false;
-    await paint();
   } catch {
-    if (current !== ticket) {
-      return;
-    }
-    error.value = "图谱查询失败";
+    error.value = "查询失败，请重试";
+  } finally {
     loading.value = false;
   }
 }
-
-onBeforeUnmount(() => {
-  chart.value?.dispose();
-});
 </script>
 
 <style scoped>
+.page {
+  max-width: 960px;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -219,32 +170,100 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 
-.toolbar .el-input {
-  max-width: 320px;
+.search-input {
+  max-width: 360px;
 }
 
-.chart {
-  width: 100%;
-  height: 480px;
+.block {
+  margin-bottom: 16px;
 }
 
-.links {
-  padding-left: 18px;
-}
-
-.links button {
-  border: 0;
-  background: transparent;
-  color: #1f6b3a;
-  cursor: pointer;
-}
-
-.citation,
-.facts p {
+.hint {
   color: #5c6b62;
 }
 
-.facts {
-  margin-top: 12px;
+.disease-name {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.card-title.good {
+  color: #2f7d4a;
+}
+
+.card-title.bad {
+  color: #c45656;
+}
+
+.notes {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.9;
+  color: #2b3a31;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.col {
+  margin-bottom: 16px;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.limit-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.limit-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f3f1;
+}
+
+.limit-list li:last-child {
+  border-bottom: 0;
+}
+
+.limit-name {
+  font-weight: 600;
+  min-width: 72px;
+}
+
+.relation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relation-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.rel-name {
+  font-weight: 500;
+}
+
+.disclaimer {
+  color: #8a9a90;
+  font-size: 13px;
 }
 </style>

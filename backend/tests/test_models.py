@@ -18,11 +18,13 @@ EXPECTED_TABLES = {
     "recipe_ingredients",
     "inventory_items",
     "meal_plans",
+    "meal_food_items",
     "shopping_lists",
     "shopping_items",
     "chat_sessions",
     "chat_messages",
     "recommend_logs",
+    "report_recipients",
     "audit_logs",
 }
 

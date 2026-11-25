@@ -21,7 +21,7 @@ export function formatAmount(value: number | null): string {
 
 export function giText(facts: NutritionFacts): string {
   if (!facts.gi_band_label) {
-    return "空";
+    return "—";
   }
   if (facts.gi_band_source === "待核对") {
     return `${facts.gi_band_label}（阈值待核对）`;

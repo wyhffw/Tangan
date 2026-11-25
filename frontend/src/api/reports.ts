@@ -103,3 +103,33 @@ export function explainReport(scope: ReportScope, day: string) {
     { timeout: 70000 },
   );
 }
+
+export interface Recipient {
+  id: number;
+  email: string;
+  enabled: boolean;
+}
+
+export interface SendResult {
+  sent: number;
+  recipients: string[];
+  date: string;
+}
+
+export function fetchRecipients() {
+  return http.get<Recipient[]>("/api/v1/report/recipients");
+}
+
+export function addRecipient(email: string) {
+  return http.post<Recipient>("/api/v1/report/recipients", { email });
+}
+
+export function deleteRecipient(id: number) {
+  return http.delete<{ ok: boolean }>(`/api/v1/report/recipients/${id}`);
+}
+
+export function sendDaily(day: string) {
+  return http.post<SendResult>("/api/v1/report/send", null, {
+    params: { date: day },
+  });
+}

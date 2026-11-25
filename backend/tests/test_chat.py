@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.agent.chat import ChatDeps, FoodRecord, classify, extract_draft, run_chat
-from app.agent.prompts import DISCLAIMER, UNAVAILABLE_CHAT
+from app.agent.prompts import DISCLAIMER
 from app.db.session import get_session
 from app.main import app
 from app.models.entities import User
@@ -135,13 +135,15 @@ def test_unknown_citation_falls_back_to_template(monkeypatch: pytest.MonkeyPatch
     assert DISCLAIMER in str(result["answer"])
 
 
-def test_chat_unavailable_when_both_models_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chat_unavailable_falls_back_to_template(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.agent.chat.generate",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")),
     )
     result = run_chat(_deps(), user_id=2, question="糖尿病能吃西瓜吗")
-    assert result["answer"] == UNAVAILABLE_CHAT
+    assert "西瓜" in str(result["answer"])
+    assert "图谱关系" in str(result["answer"])
+    assert DISCLAIMER in str(result["answer"])
 
 
 def test_recommend_route_does_not_call_chat_model(monkeypatch: pytest.MonkeyPatch) -> None:

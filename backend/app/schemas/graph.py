@@ -39,3 +39,32 @@ class FoodFacts(BaseModel):
     gi: float | None
     gi_source: str
     nutrient_source: str
+
+
+class DiseaseNoteView(BaseModel):
+    note: str
+    source: str
+
+
+class GuidanceFoodView(BaseModel):
+    name: str
+    reason: str | None
+    source: str | None
+
+
+class GuidanceLimitView(BaseModel):
+    name: str
+    max_per_day: int | None
+    unit: str | None
+    reason: str | None
+    source: str | None
+
+
+class DiseaseGuidanceView(BaseModel):
+    graph: str
+    disease: str | None
+    notes: list[DiseaseNoteView]
+    recommended: list[GuidanceFoodView]
+    avoided: list[GuidanceFoodView]
+    limits: list[GuidanceLimitView]
+    avoided_methods: list[GuidanceFoodView]

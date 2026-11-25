@@ -18,12 +18,26 @@ from app.services.recipe_nutrition import (
     calculate_recipe_nutrition,
 )
 from app.services.scoring import RESULT_LIMIT, STRICT_MINIMUM, recipe_score
+from app.services.daily_targets import (
+    DailyTargets,
+    GlucoseStatus,
+    MealTargets,
+    carb_servings,
+    daily_targets,
+    glucose_status,
+    meal_targets,
+)
 
 GraphFoods = Callable[[list[str]], tuple[str, set[int]]]
 Retriever = Callable[[str], tuple[str, list[dict[str, object]]]]
 ProfileLoader = Callable[[int], dict[str, object]]
 InventoryLoader = Callable[[int], list["StockItem"]]
 RecipeLoader = Callable[[], list["RecipeCandidate"]]
+PlanLoader = Callable[[int], list[dict[str, object]]]
+
+
+def _no_plans(_user_id: int) -> list[dict[str, object]]:
+    return []
 
 
 class RecommendError(Exception):
@@ -72,6 +86,7 @@ class RecommendDeps:
     load_recipes: RecipeLoader
     graph_foods: GraphFoods
     retrieve: Retriever
+    load_plan: PlanLoader = _no_plans
     oil_table: dict[str, tuple[Decimal | None, str]] = field(default_factory=dict)
     default_oil: OilNutrients | None = None
     food_catalog: frozenset[str] = frozenset()
@@ -94,6 +109,12 @@ class RecommendState(TypedDict, total=False):
     recommended_ids: set[int]
     chunks: list[dict[str, object]]
     rag_status: str
+    daily_targets: DailyTargets | None
+    meal_targets: MealTargets | None
+    glucose: GlucoseStatus | None
+    consumed: dict[str, object]
+    remaining: dict[str, object] | None
+    planned_today: list[dict[str, object]]
     response: dict[str, object]
 
 
@@ -125,6 +146,7 @@ def _compile(deps: RecommendDeps) -> Any:
     graph = StateGraph(RecommendState)
     graph.add_node("load_profile", lambda state: _load_profile(state, deps))
     graph.add_node("load_inventory", lambda state: _load_inventory(state, deps))
+    graph.add_node("load_plan", lambda state: _load_plan(state, deps))
     graph.add_node("rule_filter", lambda state: _rule_filter(state, deps))
     graph.add_node("graph_match", lambda state: _graph_match(state, deps))
     graph.add_node("rag_retrieve", lambda state: _rag_retrieve(state, deps))
@@ -136,7 +158,8 @@ def _compile(deps: RecommendDeps) -> Any:
         lambda state: "stop" if state.get("blocked") else "continue",
         {"stop": "post_validate", "continue": "load_inventory"},
     )
-    graph.add_edge("load_inventory", "rule_filter")
+    graph.add_edge("load_inventory", "load_plan")
+    graph.add_edge("load_plan", "rule_filter")
     graph.add_edge("rule_filter", "graph_match")
     graph.add_edge("graph_match", "rag_retrieve")
     graph.add_edge("rag_retrieve", "llm_explain")
@@ -151,6 +174,7 @@ def _load_profile(state: RecommendState, deps: RecommendDeps) -> dict[str, objec
     age = profile.get("age")
     age_value = int(age) if isinstance(age, int) else None
     outcome = evaluate({"diseases": diseases}, age=age_value)
+    targets = _targets(profile, state.get("meal_type"))
     if outcome.blocked:
         return {
             "profile": profile,
@@ -159,8 +183,9 @@ def _load_profile(state: RecommendState, deps: RecommendDeps) -> dict[str, objec
             "block_message": outcome.block_message,
             "passed": [],
             "rejected": [],
+            **targets,
         }
-    return {"profile": profile, "age": age_value, "blocked": False}
+    return {"profile": profile, "age": age_value, "blocked": False, **targets}
 
 
 def _load_inventory(state: RecommendState, deps: RecommendDeps) -> dict[str, object]:
@@ -175,6 +200,74 @@ def _load_inventory(state: RecommendState, deps: RecommendDeps) -> dict[str, obj
             continue
         candidates.append(recipe)
     return {"inventory": inventory, "candidates": candidates}
+
+
+def _load_plan(state: RecommendState, deps: RecommendDeps) -> dict[str, object]:
+    plans = deps.load_plan(state["user_id"])
+    planned_ids = {int(plan["recipe_id"]) for plan in plans}
+    meal = state.get("meal_type")
+    candidates = [
+        recipe
+        for recipe in state.get("candidates") or []
+        if recipe.recipe_id not in planned_ids
+    ]
+    by_id = {recipe.recipe_id: recipe for recipe in deps.load_recipes()}
+    consumed_kcal = Decimal(0)
+    consumed_carb = Decimal(0)
+    consumed_protein = Decimal(0)
+    consumed_fat = Decimal(0)
+    consumed_items: list[dict[str, object]] = []
+    for plan in plans:
+        if meal and plan["meal_type"] != meal:
+            continue
+        recipe = by_id.get(int(plan["recipe_id"]))
+        if recipe is None:
+            continue
+        nutrition = calculate_recipe_nutrition(
+            recipe.ingredients,
+            servings=recipe.servings,
+            cooking_method=recipe.cooking_method,
+            oil_table=deps.oil_table,
+            default_oil=deps.default_oil,
+        )
+        kcal = nutrition.kcal or Decimal(0)
+        carb = nutrition.carb_g or Decimal(0)
+        protein = nutrition.protein_g or Decimal(0)
+        fat = nutrition.fat_g or Decimal(0)
+        consumed_kcal += kcal
+        consumed_carb += carb
+        consumed_protein += protein
+        consumed_fat += fat
+        consumed_items.append(
+            {
+                "recipe_id": int(plan["recipe_id"]),
+                "name": recipe.name,
+                "meal_type": plan["meal_type"],
+                "kcal": _number(kcal),
+                "carb_g": _number(carb),
+                "protein_g": _number(protein),
+                "fat_g": _number(fat),
+            }
+        )
+    consumed: dict[str, object] = {
+        "items": consumed_items,
+        "kcal": _number(consumed_kcal),
+        "carb_g": _number(consumed_carb),
+        "protein_g": _number(consumed_protein),
+        "fat_g": _number(consumed_fat),
+    }
+    return {
+        "candidates": candidates,
+        "consumed": consumed,
+        "remaining": _remaining(
+            state.get("meal_targets"),
+            consumed_kcal,
+            consumed_carb,
+            consumed_protein,
+            consumed_fat,
+        ),
+        "planned_today": plans,
+    }
 
 
 def _rule_filter(state: RecommendState, deps: RecommendDeps) -> dict[str, object]:
@@ -262,11 +355,20 @@ def _graph_match(state: RecommendState, deps: RecommendDeps) -> dict[str, object
     except Exception:  # noqa: BLE001
         status, recommended = "down", set()
     stock = {item.food_id: item for item in state.get("inventory") or []}
+    glucose = state.get("glucose")
+    remaining = state.get("remaining")
     ranked: list[ScoredRecipe] = []
     for item in state.get("passed") or []:
         item.score = _score_later(item, stock, recommended if status == "up" else set())
+        item.score += _low_gi_bonus(item, glucose)
         ranked.append(item)
-    ranked.sort(key=lambda item: (-item.score, item.candidate.recipe_id))
+    ranked.sort(
+        key=lambda item: (
+            -item.score,
+            _over_budget(item, remaining),
+            item.candidate.recipe_id,
+        )
+    )
     return {"passed": ranked, "graph_status": status, "recommended_ids": recommended}
 
 
@@ -307,6 +409,11 @@ def _post_validate(state: RecommendState, deps: RecommendDeps) -> dict[str, obje
                 strict=[],
                 relaxed=[],
                 rejected=state.get("rejected") or [],
+                daily_targets=state.get("daily_targets"),
+                meal_targets=state.get("meal_targets"),
+                glucose=state.get("glucose"),
+                consumed=state.get("consumed"),
+                remaining=state.get("remaining"),
             )
         }
     ordered = [
@@ -337,6 +444,11 @@ def _post_validate(state: RecommendState, deps: RecommendDeps) -> dict[str, obje
             strict=[_item_payload(item) for item in strict],
             relaxed=[_item_payload(item) for item in relaxed],
             rejected=state.get("rejected") or [],
+            daily_targets=state.get("daily_targets"),
+            meal_targets=state.get("meal_targets"),
+            glucose=state.get("glucose"),
+            consumed=state.get("consumed"),
+            remaining=state.get("remaining"),
         )
     }
 
@@ -480,6 +592,7 @@ def _item_payload(item: ScoredRecipe) -> dict[str, object]:
         "gi_band_source": nutrition.gi_band_source,
         "gl_estimate": _number(nutrition.gl_estimate),
         "gl_is_approximate": nutrition.gl_is_approximate,
+        "carb_servings": carb_servings(nutrition.carb_g),
     }
 
 
@@ -492,6 +605,11 @@ def _response(
     strict: list[dict[str, object]],
     relaxed: list[dict[str, object]],
     rejected: list[dict[str, object]],
+    daily_targets: DailyTargets | None = None,
+    meal_targets: MealTargets | None = None,
+    glucose: GlucoseStatus | None = None,
+    consumed: dict[str, object] | None = None,
+    remaining: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "graph": graph,
@@ -501,6 +619,11 @@ def _response(
         "strict": strict,
         "relaxed": relaxed,
         "rejected": rejected,
+        "daily_targets": _daily_payload(daily_targets),
+        "meal_targets": _meal_payload(meal_targets),
+        "glucose": _glucose_payload(glucose),
+        "consumed": consumed,
+        "remaining": remaining,
     }
 
 
@@ -508,3 +631,108 @@ def _number(value: Decimal | None) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _targets(profile: dict[str, object], meal_type: str | None) -> dict[str, object]:
+    glucose = glucose_status(
+        _decimal(profile.get("fasting_glucose")),
+        _decimal(profile.get("hba1c")),
+    )
+    daily = daily_targets(
+        _decimal(profile.get("height_cm")),
+        _decimal(profile.get("weight_kg")),
+        _text(profile.get("activity_level")),
+        carb_scale=glucose.carb_scale,
+    )
+    meal = meal_targets(daily, meal_type) if daily is not None else None
+    return {"daily_targets": daily, "meal_targets": meal, "glucose": glucose}
+
+
+def _decimal(value: object) -> Decimal | None:
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    return None
+
+
+def _text(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _daily_payload(targets: DailyTargets | None) -> dict[str, object] | None:
+    if targets is None:
+        return None
+    return {
+        "daily_kcal": targets.daily_kcal,
+        "carb_g": float(targets.carb_g),
+        "protein_g": float(targets.protein_g),
+        "fat_g": float(targets.fat_g),
+        "macro_source": targets.macro_source,
+        "meal_split_source": targets.meal_split_source,
+    }
+
+
+def _meal_payload(targets: MealTargets | None) -> dict[str, object] | None:
+    if targets is None:
+        return None
+    return {
+        "meal_type": targets.meal_type,
+        "kcal": float(targets.kcal),
+        "carb_g": float(targets.carb_g),
+        "protein_g": float(targets.protein_g),
+        "fat_g": float(targets.fat_g),
+    }
+
+
+def _glucose_payload(glucose: GlucoseStatus | None) -> dict[str, object] | None:
+    if glucose is None:
+        return None
+    return {
+        "level": glucose.level,
+        "fasting_glucose": glucose.fasting_glucose,
+        "hba1c": glucose.hba1c,
+        "carb_scale": float(glucose.carb_scale),
+        "source": glucose.source,
+    }
+
+
+def _remaining(
+    targets: MealTargets | None,
+    consumed_kcal: Decimal,
+    consumed_carb: Decimal,
+    consumed_protein: Decimal,
+    consumed_fat: Decimal,
+) -> dict[str, object] | None:
+    if targets is None:
+        return None
+    kcal = max(Decimal(0), targets.kcal - consumed_kcal)
+    carb = max(Decimal(0), targets.carb_g - consumed_carb)
+    protein = max(Decimal(0), targets.protein_g - consumed_protein)
+    fat = max(Decimal(0), targets.fat_g - consumed_fat)
+    return {
+        "kcal": float(kcal),
+        "carb_g": float(carb),
+        "protein_g": float(protein),
+        "fat_g": float(fat),
+    }
+
+
+LOW_GI_BONUS = 4
+
+
+def _low_gi_bonus(item: ScoredRecipe, glucose: GlucoseStatus | None) -> int:
+    if glucose is None or glucose.level == "normal":
+        return 0
+    return LOW_GI_BONUS if item.nutrition.gi_band == "low" else 0
+
+
+def _over_budget(item: ScoredRecipe, remaining: dict[str, object] | None) -> int:
+    if remaining is None or item.nutrition.carb_g is None:
+        return 0
+    budget = remaining.get("carb_g")
+    if not isinstance(budget, (int, float)):
+        return 0
+    return 1 if item.nutrition.carb_g > Decimal(str(budget)) else 0

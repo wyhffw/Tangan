@@ -15,12 +15,12 @@ from app.agent.prompts import (
     CHAT_SYSTEM,
     DISCLAIMER,
     PROFILE_UPDATE_SYSTEM,
-    UNAVAILABLE_CHAT,
 )
+from app.agent.help_guide import HELP_SYSTEM, guide_context
 from app.core.llm import generate
 from app.rules.engine import evaluate
 
-Route = Literal["knowledge", "recommend", "report", "profile_update", "blocked"]
+Route = Literal["knowledge", "recommend", "report", "profile_update", "help", "blocked"]
 FoodLister = Callable[[], list["FoodRecord"]]
 GraphLookup = Callable[[str], tuple[str, list[dict[str, object]]]]
 Retriever = Callable[[str], tuple[str, list[dict[str, object]]]]
@@ -41,6 +41,14 @@ _RELATION = {
     "AVOID_METHOD": "避免做法",
     "SUBSTITUTE": "可替换",
 }
+
+_HELP_MARKERS = (
+    "怎么操作", "怎么使用", "如何使用", "怎么用", "如何用", "怎么添加", "如何添加",
+    "怎么设置", "如何设置", "怎么查看", "如何查看", "怎么录入", "如何录入", "怎么填写",
+    "如何填写", "怎么生成", "如何生成", "怎么转发", "如何转发", "操作步骤", "使用方法",
+    "怎么找到", "如何找到", "在哪里", "在哪里看", "怎么打开", "如何打开", "网页怎么",
+    "这个怎么", "功能介绍", "有哪些功能", "功能有哪些",
+)
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,8 @@ class ChatState(TypedDict, total=False):
 
 def classify(question: str) -> Route:
     text = question.strip()
+    if any(marker in text for marker in _HELP_MARKERS):
+        return "help"
     if any(marker in text for marker in ("过敏", "不吃", "忌口", "不喜欢")):
         return "profile_update"
     if any(marker in text for marker in ("做什么", "推荐", "换一批", "来一道", "有什么菜")):
@@ -254,6 +264,8 @@ def _respond(state: ChatState, _deps: ChatDeps) -> dict[str, object]:
     if state.get("blocked"):
         return {}
     route = state.get("route")
+    if route == "help":
+        return _help_answer(state)
     if route == "recommend":
         return _recommend_answer(state)
     if route == "report":
@@ -271,6 +283,36 @@ def _respond(state: ChatState, _deps: ChatDeps) -> dict[str, object]:
             "sources": [],
         }
     return _knowledge_answer(state)
+
+
+def _help_answer(state: ChatState) -> dict[str, object]:
+    question = str(state.get("question") or "")
+    context = guide_context(question)
+    if not context:
+        return {
+            "answer": (
+                "我还不清楚这个功能的操作。你可以问：怎么添加食材、怎么生成推荐、"
+                "怎么填写健康档案、怎么转发报告、怎么设置大模型等。"
+            ),
+            "citation_ids": [],
+            "sources": [],
+        }
+    try:
+        raw = generate(
+            [
+                {"role": "system", "content": HELP_SYSTEM},
+                {"role": "user", "content": json.dumps(
+                    {"guide": context, "question": question}, ensure_ascii=False
+                )},
+            ],
+            purpose="chat",
+        )
+        parsed = _parse_json(raw)
+    except Exception:  # noqa: BLE001
+        parsed = None
+    if parsed and str(parsed.get("answer") or "").strip():
+        return {"answer": str(parsed["answer"]).strip(), "citation_ids": [], "sources": []}
+    return {"answer": context, "citation_ids": [], "sources": []}
 
 
 def _knowledge_answer(state: ChatState) -> dict[str, object]:
@@ -292,8 +334,8 @@ def _knowledge_answer(state: ChatState) -> dict[str, object]:
         parsed = _parse_json(raw)
     except Exception:  # noqa: BLE001
         return {
-            "answer": UNAVAILABLE_CHAT,
-            "citation_ids": [],
+            "answer": fallback,
+            "citation_ids": chunk_ids,
             "sources": sources,
         }
     if parsed is None:

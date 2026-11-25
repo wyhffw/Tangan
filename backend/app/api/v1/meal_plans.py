@@ -9,9 +9,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_session
 from app.models.entities import User
-from app.schemas.meal_plans import MealPlanCreate, MealPlanItem, MealPlanView
+from app.schemas.meal_plans import (
+    MealPlanCreate,
+    MealPlanItem,
+    MealPlanView,
+    PlanSummary,
+)
 from app.services.inventory import today_in_app_tz
-from app.services.meal_plans import add_to_plan, delete_plan, list_plans
+from app.services.meal_plans import add_to_plan, delete_plan, list_plans, plan_summary
 
 router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
 
@@ -24,6 +29,15 @@ def read_meal_plans(
 ) -> list[MealPlanItem]:
     report_day = day or today_in_app_tz()
     return [MealPlanItem.model_validate(item) for item in list_plans(session, user.id, report_day)]
+
+
+@router.get("/summary", response_model=PlanSummary)
+def read_plan_summary(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    day: Annotated[date | None, Query(alias="date")] = None,
+) -> PlanSummary:
+    return PlanSummary.model_validate(plan_summary(session, user.id, day))
 
 
 @router.post("", response_model=MealPlanView)

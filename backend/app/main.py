@@ -11,11 +11,13 @@ from app.api.v1.chat import router as chat_router
 from app.api.v1.graph import router as graph_router
 from app.api.v1.inventory import router as inventory_router
 from app.api.v1.llm_config import router as llm_config_router
+from app.api.v1.meal_foods import router as meal_foods_router
 from app.api.v1.meal_plans import router as meal_plans_router
 from app.api.v1.metrics import router as metrics_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.recipes import router as recipes_router
 from app.api.v1.recommend import router as recommend_router
+from app.api.v1.report_delivery import router as report_delivery_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.shopping import router as shopping_router
 from app.core.health import health_payload
@@ -34,6 +36,11 @@ from app.services.meal_plans import MealPlanError
 from app.services.profile import ProfileError
 from app.services.recipes import RecipeError
 from app.services.recommend import RecommendDataError
+from app.services.report_delivery import (
+    ReportDeliveryError,
+    start_report_scheduler,
+    stop_report_scheduler,
+)
 from app.services.shopping import ShoppingError
 
 setup_logging()
@@ -42,7 +49,9 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     start_expiry_scheduler()
+    start_report_scheduler()
     yield
+    stop_report_scheduler()
     stop_expiry_scheduler()
 
 
@@ -58,8 +67,10 @@ app.include_router(llm_config_router, prefix="/api/v1")
 app.include_router(recommend_router, prefix="/api/v1")
 app.include_router(recipes_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(report_delivery_router, prefix="/api/v1")
 app.include_router(shopping_router, prefix="/api/v1")
 app.include_router(meal_plans_router, prefix="/api/v1")
+app.include_router(meal_foods_router, prefix="/api/v1")
 app.include_router(metrics_router, prefix="/api/v1")
 
 
@@ -89,6 +100,16 @@ async def handle_graph_error(_request: Request, exc: GraphError) -> JSONResponse
 
 @app.exception_handler(ProfileError)
 async def handle_profile_error(_request: Request, exc: ProfileError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+    )
+
+
+@app.exception_handler(ReportDeliveryError)
+async def handle_report_delivery_error(
+    _request: Request, exc: ReportDeliveryError
+) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "code": exc.code},

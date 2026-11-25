@@ -30,6 +30,7 @@ class RecommendItem(BaseModel):
     gi_band_source: str
     gl_estimate: float | None
     gl_is_approximate: bool
+    carb_servings: float | None = None
 
 
 class RejectReason(BaseModel):
@@ -44,6 +45,56 @@ class RejectedRecipe(BaseModel):
     reasons: list[RejectReason]
 
 
+class DailyTargets(BaseModel):
+    daily_kcal: int
+    carb_g: float
+    protein_g: float
+    fat_g: float
+    macro_source: str
+    meal_split_source: str
+
+
+class MealTargets(BaseModel):
+    meal_type: str
+    kcal: float
+    carb_g: float
+    protein_g: float
+    fat_g: float
+
+
+class GlucoseStatus(BaseModel):
+    level: str
+    fasting_glucose: float | None
+    hba1c: float | None
+    carb_scale: float
+    source: str
+
+
+class ConsumedItem(BaseModel):
+    recipe_id: int
+    name: str
+    meal_type: str
+    kcal: float | None
+    carb_g: float | None
+    protein_g: float | None = None
+    fat_g: float | None = None
+
+
+class Consumed(BaseModel):
+    items: list[ConsumedItem]
+    kcal: float | None
+    carb_g: float | None
+    protein_g: float | None = None
+    fat_g: float | None = None
+
+
+class RemainingBudget(BaseModel):
+    kcal: float
+    carb_g: float
+    protein_g: float
+    fat_g: float
+
+
 class RecommendResponse(BaseModel):
     graph: str
     rag: str
@@ -52,3 +103,8 @@ class RecommendResponse(BaseModel):
     strict: list[RecommendItem]
     relaxed: list[RecommendItem]
     rejected: list[RejectedRecipe]
+    daily_targets: DailyTargets | None = None
+    meal_targets: MealTargets | None = None
+    glucose: GlucoseStatus | None = None
+    consumed: Consumed | None = None
+    remaining: RemainingBudget | None = None

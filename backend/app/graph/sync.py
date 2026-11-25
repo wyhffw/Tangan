@@ -17,6 +17,7 @@ from app.services.recipe_nutrition import load_cooking_oil
 
 _ROOT = Path(__file__).resolve().parents[3]
 _RELATIONS = _ROOT / "data" / "processed" / "disease_relations.csv"
+_NOTES = _ROOT / "data" / "processed" / "disease_notes.csv"
 _KINDS = frozenset({"RECOMMEND", "AVOID", "LIMIT", "AVOID_METHOD", "SUBSTITUTE"})
 _BATCH = 400
 
@@ -38,6 +39,13 @@ class RelationRow:
     source: str
     max_per_day: int | None
     unit: str | None
+
+
+@dataclass(frozen=True)
+class DiseaseNote:
+    disease: str
+    note: str
+    source: str
 
 
 def food_properties(food: Food) -> dict[str, object]:
@@ -63,6 +71,19 @@ def load_relations(path: Path | None = None) -> tuple[RelationRow, ...]:
                 raise GraphDataError(f"关系重复：{row.kind} {row.from_name} -> {row.to_name}")
             seen.add(key)
             rows.append(row)
+    return tuple(rows)
+
+
+def load_notes(path: Path | None = None) -> tuple[DiseaseNote, ...]:
+    rows: list[DiseaseNote] = []
+    with (path or _NOTES).open(encoding="utf-8-sig", newline="") as handle:
+        for raw in csv.DictReader(handle):
+            disease = (raw.get("disease") or "").strip()
+            note = (raw.get("note") or "").strip()
+            source = (raw.get("source") or "").strip()
+            if not disease or not note:
+                continue
+            rows.append(DiseaseNote(disease=disease, note=note, source=source))
     return tuple(rows)
 
 

@@ -33,6 +33,8 @@ def normalize_provider(provider: str) -> str:
     name = (provider or "").strip().lower()
     if name in {"qwen", "tongyi", "dashscope"}:
         return "qwen"
+    if name == "ollama":
+        return "ollama"
     return "deepseek"
 
 
@@ -55,6 +57,10 @@ def get_llm_config(settings: Settings | None = None) -> dict[str, str]:
     settings = settings or get_settings()
     runtime = _load()
     provider = normalize_provider(runtime.get("provider") or settings.llm_provider)
+    if provider == "ollama":
+        base_url = (runtime.get("base_url") or "").strip() or settings.ollama_base_url
+        model = (runtime.get("model") or "").strip() or settings.ollama_model
+        return {"provider": provider, "api_key": "ollama", "base_url": base_url, "model": model}
     base_url = (runtime.get("base_url") or "").strip() or PROVIDER_BASE_URLS[provider]
     model = (runtime.get("model") or "").strip() or PROVIDER_DEFAULT_MODELS[provider]
     api_key = runtime.get("api_key") or settings.llm_api_key or ""
@@ -74,12 +80,21 @@ def save_llm_config(
 ) -> dict[str, str]:
     global _cache, _loaded
     provider = normalize_provider(provider)
-    data = {
-        "provider": provider,
-        "api_key": (api_key or "").strip(),
-        "model": (model or "").strip() or PROVIDER_DEFAULT_MODELS[provider],
-        "base_url": (base_url or "").strip() or PROVIDER_BASE_URLS[provider],
-    }
+    settings = get_settings()
+    if provider == "ollama":
+        data = {
+            "provider": provider,
+            "api_key": "",
+            "model": (model or "").strip() or settings.ollama_model,
+            "base_url": (base_url or "").strip() or settings.ollama_base_url,
+        }
+    else:
+        data = {
+            "provider": provider,
+            "api_key": (api_key or "").strip(),
+            "model": (model or "").strip() or PROVIDER_DEFAULT_MODELS[provider],
+            "base_url": (base_url or "").strip() or PROVIDER_BASE_URLS[provider],
+        }
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _lock:
         _cache = dict(data)
